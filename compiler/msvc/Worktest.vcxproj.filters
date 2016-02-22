@@ -31,6 +31,15 @@
     <Filter Include="Header Files\format">
       <UniqueIdentifier>{4c81b866-de28-446b-b086-1174d99d1ed3}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Resource Files\assets">
+      <UniqueIdentifier>{31934c27-71ea-4462-82ac-e61cee4f9f1e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resource Files\assets\textures">
+      <UniqueIdentifier>{8bfcefdf-8a6c-40c7-b937-6ba9dcaa12d7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resource Files\assets\shaders">
+      <UniqueIdentifier>{09d41d36-77ac-4a1e-8881-a854339f96a7}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\external\include\king\SdlWindow.cpp">
@@ -110,5 +119,13 @@
     <ClInclude Include="..\include\SpriteTexture.hpp">
       <Filter>Header Files\game</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\assets\shaders\sprite.frag">
+      <Filter>Resource Files\assets\shaders</Filter>
+    </None>
+    <None Include="..\..\assets\shaders\sprite.vert">
+      <Filter>Resource Files\assets\shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

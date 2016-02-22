@@ -31,9 +31,6 @@ namespace King {
 		Sdl mSdl;
 		SdlWindow mSdlWindow;
 		GlContext mGlContext;
-		
-		std::unique_ptr<SdlSurface> mSdlSurfaceContainer[Engine::TEXTURE_MAX];
-		std::unique_ptr<SdlSurface> mFontSdlSurface;
 
 		std::unique_ptr<SpriteTexture> mSpriteTextures[Engine::TEXTURE_MAX];
 		std::unique_ptr<SpriteBatch> mSpriteBatches[Engine::SPRITE_MAX];
@@ -75,21 +72,16 @@ namespace King {
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 		std::string assets(assetsDirectory);
-		std::string background = assets; background += "/BackGround.jpg";
-		std::string blue = assets; blue += "/Blue.png";
-		std::string green = assets; green += "/Green.png";
-		std::string purple = assets; purple += "/Purple.png";
-		std::string red = assets; red += "/Red.png";
-		std::string yellow = assets; yellow += "/Yellow.png";
-		std::string font = assets; font += "/berlin_sans_demi_72_0.png";
+		std::string background = assets; background += "/textures/BackGround.jpg";
+		std::string blue = assets; blue += "/textures/Blue.png";
+		std::string green = assets; green += "/textures/Green.png";
+		std::string purple = assets; purple += "/textures/Purple.png";
+		std::string red = assets; red += "/textures/Red.png";
+		std::string yellow = assets; yellow += "/textures/Yellow.png";
+		std::string font = assets; font += "/textures/berlin_sans_demi_72_0.png";
 
-		mPimpl->mSdlSurfaceContainer[Engine::TEXTURE_BACKGROUND].reset(new SdlSurface(background.c_str()));
-		mPimpl->mSdlSurfaceContainer[Engine::TEXTURE_BLUE].reset(new SdlSurface(blue.c_str()));
-		mPimpl->mSdlSurfaceContainer[Engine::TEXTURE_GREEN].reset(new SdlSurface(green.c_str()));
-		mPimpl->mSdlSurfaceContainer[Engine::TEXTURE_PURPLE].reset(new SdlSurface(purple.c_str()));
-		mPimpl->mSdlSurfaceContainer[Engine::TEXTURE_RED].reset(new SdlSurface(red.c_str()));
-		mPimpl->mSdlSurfaceContainer[Engine::TEXTURE_YELLOW].reset(new SdlSurface(yellow.c_str()));
-		mPimpl->mFontSdlSurface.reset(new SdlSurface(font.c_str()));
+		mPimpl->mSpriteTextures[Engine::TEXTURE_BACKGROUND].reset(new SpriteTexture());
+		mPimpl->mSpriteTextures[Engine::TEXTURE_BACKGROUND]->create(background.c_str());
 	}
 
 	Engine::~Engine() {
@@ -122,19 +114,21 @@ namespace King {
 	}
 
 	int Engine::GetTextureHeight(Texture texture) const {
-		return mPimpl->mSdlSurfaceContainer[texture]->Height();
+		//return mPimpl->mSdlSurfaceContainer[texture]->Height();
+		return 0;
 	}
 
 	int Engine::GetTextureWidth(Texture texture) const {
-		return mPimpl->mSdlSurfaceContainer[texture]->Width();
+		//return mPimpl->mSdlSurfaceContainer[texture]->Width();
+		return 0;
 	}
 
 	void Engine::Render(Engine::Texture texture, const glm::mat4& transform) {
 		//glLoadMatrixf(reinterpret_cast<const float*>(&transform));
 
-		SdlSurface& surface = *mPimpl->mSdlSurfaceContainer[texture];
+		//SdlSurface& surface = *mPimpl->mSdlSurfaceContainer[texture];
 
-		surface.Bind();
+		//surface.Bind();
 
 		//glBegin(GL_QUADS);
 		//glTexCoord2i(0, 1); glVertex2i(0, surface.Height());
@@ -177,7 +171,7 @@ namespace King {
 		for (; *text;++text) {
 			Glyph& g = FindGlyph(*text);
 
-			float fontTexWidth  = static_cast<float>(mPimpl->mFontSdlSurface->Width());
+		/*	float fontTexWidth  = static_cast<float>(mPimpl->mFontSdlSurface->Width());
 			float fontTexHeight = static_cast<float>(mPimpl->mFontSdlSurface->Height());
 
 			float uvLeft = static_cast<float>(g.x) / fontTexWidth;
@@ -190,7 +184,7 @@ namespace King {
 			float worldBottom = static_cast<float>(g.yoffset);
 			float worldTop = static_cast<float>(g.yoffset + g.height);
 
-			mPimpl->mFontSdlSurface->Bind();
+			mPimpl->mFontSdlSurface->Bind();*/
 
 			//glBegin(GL_QUADS);
 			//glTexCoord2f(uvLeft / 2.0f, uvTop / 2.0f); glVertex2f(worldLeft * TextScale, worldTop * TextScale);

@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
 	}
 	catch (const std::exception& e)
 	{
-		fprintf(stderr, "Unhanded exception %s\n", e.what());
+		fprintf(stderr, "Unhanded exception: %s\n", e.what());
 		assert(0);
 	}
 

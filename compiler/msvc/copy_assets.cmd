@@ -1,0 +1,1 @@
+robocopy ../../assets ../bin/assets /MIR
