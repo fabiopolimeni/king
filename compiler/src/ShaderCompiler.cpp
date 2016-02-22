@@ -84,7 +84,7 @@ namespace gl
 		glGetShaderiv(shader_name, GL_INFO_LOG_LENGTH, &log_length);
 		if (log_length > 0)
 		{
-			std::vector<char> log_buffer(log_length);
+			log_buffer.resize(log_length);
 			glGetShaderInfoLog(shader_name, log_length, NULL, &log_buffer[0]);
 		}
 
@@ -103,6 +103,7 @@ namespace gl
 		glGetProgramiv(prog_name, GL_INFO_LOG_LENGTH, &log_length);
 		if (log_length > 0)
 		{
+			log_buffer.resize(log_length);
 			glGetProgramInfoLog(prog_name, log_length, NULL, &log_buffer[0]);
 		}
 

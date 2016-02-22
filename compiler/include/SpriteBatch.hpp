@@ -82,12 +82,12 @@ private:
 
 	struct Transform
 	{
-		glm::vec2		mPos;
-		glm::vec2		mScale;
-		glm::vec2		mRot;
+		glm::vec2			mPos;
+		glm::vec2			mScale;
+		glm::vec2			mRot;
 
-		const uint32_t	mTemplateId;
-		const float		mPad;
+		const glm::uint32	mTemplateId;
+		const glm::float32	mPad;
 	};
 
 	GraphicsPipeline mGraphicsPipe;
