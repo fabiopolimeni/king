@@ -1,0 +1,114 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Source Files\kinglib">
+      <UniqueIdentifier>{71369e4a-8c3f-454a-bdba-5c82895475ea}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\kinglib">
+      <UniqueIdentifier>{6821ade4-45c6-4243-9e66-0f5cdb1a863b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\format">
+      <UniqueIdentifier>{b35e21ae-1309-4b93-9299-6b58ab4a57ee}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\game">
+      <UniqueIdentifier>{153198b9-d182-46c3-bc36-66a71f8e68b9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\game">
+      <UniqueIdentifier>{14cfec90-538e-4ae1-bd79-bb3a0d79a3ba}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\format">
+      <UniqueIdentifier>{4c81b866-de28-446b-b086-1174d99d1ed3}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\external\include\king\SdlWindow.cpp">
+      <Filter>Source Files\kinglib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\external\include\king\Engine.cpp">
+      <Filter>Source Files\kinglib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\external\include\king\Font.cpp">
+      <Filter>Source Files\kinglib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\external\include\king\GlContext.cpp">
+      <Filter>Source Files\kinglib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\external\include\king\Sdl.cpp">
+      <Filter>Source Files\kinglib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\external\include\king\SdlSurface.cpp">
+      <Filter>Source Files\kinglib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\format.cpp">
+      <Filter>Source Files\format</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\GraphicsPipeline.cpp">
+      <Filter>Source Files\game</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\ShaderCompiler.cpp">
+      <Filter>Source Files\game</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\SpriteBatch.cpp">
+      <Filter>Source Files\game</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\SpriteTexture.cpp">
+      <Filter>Source Files\game</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\external\include\king\Engine.h">
+      <Filter>Header Files\kinglib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\external\include\king\Font.h">
+      <Filter>Header Files\kinglib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\external\include\king\GlContext.h">
+      <Filter>Header Files\kinglib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\external\include\king\Sdl.h">
+      <Filter>Header Files\kinglib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\external\include\king\SdlSurface.h">
+      <Filter>Header Files\kinglib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\external\include\king\SdlWindow.h">
+      <Filter>Header Files\kinglib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\external\include\king\Updater.h">
+      <Filter>Header Files\kinglib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\GraphicsPipeline.hpp">
+      <Filter>Header Files\game</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\OGL.hpp">
+      <Filter>Header Files\game</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\ShaderCompiler.hpp">
+      <Filter>Header Files\game</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\format.hpp">
+      <Filter>Header Files\format</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SpriteBatch.hpp">
+      <Filter>Header Files\game</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\SpriteTexture.hpp">
+      <Filter>Header Files\game</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
