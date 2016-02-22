@@ -14,8 +14,10 @@ class SpriteBatch
 
 public:
 
-	const static size_t INDEX_NONE = -1;
-	const static size_t INSTANCE_VERTS = 6;
+	const static size_t	INDEX_NONE = -1;
+	const static size_t	MAX_VERTICES = 6;
+	const static size_t	MAX_TEMPLATES = 16;
+	const static size_t	MAX_INSTANCES = 256;
 
 	enum Uniform
 	{
@@ -27,7 +29,7 @@ public:
 
 	struct Template
 	{
-		typedef std::array<glm::vec4, INSTANCE_VERTS> vbo_t;
+		typedef std::array<glm::vec4, MAX_VERTICES> vbo_t;
 		const vbo_t&	mVBO;
 		const size_t	mTemplateId;
 		
@@ -53,8 +55,9 @@ public:
 		}
 	};
 
-	bool init(uint32_t texture_id, const char* vs_source, const char* fs_source,
-		size_t max_templates, size_t max_sprites, glm::mat4 projection);
+	bool init(glm::mat4 projection, uint32_t texture_id,
+		const char* vs_source, const char* fs_source,
+		size_t max_templates, size_t max_sprites);
 
 	void release();
 
@@ -81,10 +84,10 @@ private:
 	{
 		glm::vec2		mPos;
 		glm::vec2		mScale;
-		float			mRot;
+		glm::vec2		mRot;
 
 		const uint32_t	mTemplateId;
-		const glm::vec2	mPad;
+		const float		mPad;
 	};
 
 	GraphicsPipeline mGraphicsPipe;

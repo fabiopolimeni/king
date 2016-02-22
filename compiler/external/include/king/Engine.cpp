@@ -32,7 +32,7 @@ namespace King {
 		SdlWindow mSdlWindow;
 		GlContext mGlContext;
 
-		std::unique_ptr<SpriteTexture> mSpriteTextures[Engine::TEXTURE_MAX];
+		std::unique_ptr<SpriteTexture> mSpriteTextures[Engine::SPRITE_MAX];
 		std::unique_ptr<SpriteBatch> mSpriteBatches[Engine::SPRITE_MAX];
 
 		float mElapsedTicks;
@@ -71,17 +71,33 @@ namespace King {
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-		std::string assets(assetsDirectory);
-		std::string background = assets; background += "/textures/BackGround.jpg";
-		std::string blue = assets; blue += "/textures/Blue.png";
-		std::string green = assets; green += "/textures/Green.png";
-		std::string purple = assets; purple += "/textures/Purple.png";
-		std::string red = assets; red += "/textures/Red.png";
-		std::string yellow = assets; yellow += "/textures/Yellow.png";
-		std::string font = assets; font += "/textures/berlin_sans_demi_72_0.png";
+		std::string assets_dir(assetsDirectory);
+		std::string texture_files[Engine::SPRITE_MAX] = {
+			assets_dir + "/textures/Cell.dds",
+			assets_dir + "/textures/Diamonds.dds",
+			assets_dir + "/textures/berlin_sans_demi_72_0.dds"
+		};
 
-		mPimpl->mSpriteTextures[Engine::TEXTURE_BACKGROUND].reset(new SpriteTexture());
-		mPimpl->mSpriteTextures[Engine::TEXTURE_BACKGROUND]->create(background.c_str());
+		std::string vert_shader_file = assets_dir + "/shaders/sprite.vert";
+		std::string frag_shader_file = assets_dir + "/shaders/sprite.frag";
+
+		glm::mat4 projection = glm::ortho(0.0f, float(WindowWidth), float(WindowHeight), 0.0f, -1.0f, 1.0f);
+
+		for (size_t si = 0; si < Engine::SPRITE_MAX; ++si)
+		{
+			auto* sprite_textrue = new SpriteTexture();
+			sprite_textrue->create(texture_files[si].c_str());
+
+			auto* sprite_batch = new SpriteBatch();
+			sprite_batch->init(projection, sprite_textrue->getTexId(),
+				vert_shader_file.c_str(), frag_shader_file.c_str(),
+				SpriteBatch::MAX_TEMPLATES, SpriteBatch::MAX_INSTANCES
+			);
+
+			// Add texture and sprite batch to the managed pointers
+			mPimpl->mSpriteTextures[si].reset(sprite_textrue);
+			mPimpl->mSpriteBatches[si].reset(sprite_batch);
+		}
 	}
 
 	Engine::~Engine() {

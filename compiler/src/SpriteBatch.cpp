@@ -3,6 +3,7 @@
 #include "OGL.hpp"
 
 #include <cassert>
+#include <cmath>
 #include <algorithm>
 #include <memory>
 #include <utility>
@@ -23,6 +24,17 @@ namespace
 	{
 		const size_t r = m ? n % m : 0;
 		return (r == 0) ? n : n + m - r;
+	}
+
+	const float PI = 3.1415927f;
+	float deg2Rad(float degrees)
+	{
+		return degrees * PI / 180.0f;
+	}
+
+	float rad2Deg(float radians)
+	{
+		return radians * 180.0f / PI;
 	}
 
 	gl::uint32 initUBO(int32_t size, bool dynamic)
@@ -100,8 +112,9 @@ namespace
 	}
 }
 
-bool SpriteBatch::init(uint32_t texture_id, const char * vs_source, const char * fs_source,
-	size_t max_templates, size_t max_sprites, glm::mat4 projection)
+bool SpriteBatch::init(glm::mat4 projection, uint32_t texture_id,
+	const char * vs_source, const char * fs_source,
+	size_t max_templates, size_t max_sprites)
 {
 	std::array<const char*, GraphicsPipeline::StageType::eST_MAX> filestages = {
 		vs_source, nullptr, nullptr, nullptr, fs_source, nullptr
@@ -216,11 +229,11 @@ void SpriteBatch::draw() const
 	glBindVertexArray(mVAO);
 
 	// buffer vertex count
-	glDrawArraysInstanced(GL_TRIANGLES, 0, INSTANCE_VERTS, mInstances.size());
+	glDrawArraysInstanced(GL_TRIANGLES, 0, MAX_VERTICES, mInstances.size());
 }
 
 SpriteBatch::Template SpriteBatch::Template::INVALID = {
-	std::array<glm::vec4, INSTANCE_VERTS>(), INDEX_NONE
+	std::array<glm::vec4, MAX_VERTICES>(), INDEX_NONE
 };
 
 SpriteBatch::Instance SpriteBatch::Instance::INVALID = {
@@ -233,7 +246,11 @@ bool SpriteBatch::update(const Instance & instance_ref, glm::vec2 position, glm:
 	{
 		mInstances[instance_ref.mInstanceId].mPos = position;
 		mInstances[instance_ref.mInstanceId].mScale = scale;
-		mInstances[instance_ref.mInstanceId].mRot = rotation;
+		
+		// Store sin and cos respectively in x and y of the rotation vector
+		float theta = deg2Rad(rotation);
+		mInstances[instance_ref.mInstanceId].mRot = glm::vec2(sin(theta), cos(theta));
+
 		mPendingInstances.emplace(instance_ref.mInstanceId);
 		return true;
 	}
@@ -250,7 +267,7 @@ SpriteBatch::Template SpriteBatch::create(glm::vec4 atlas_offsets)
 
 	// Interleaved array of vertex
 	// positions and texture coordinates
-	const std::array<glm::vec4, INSTANCE_VERTS> vbo = {
+	const std::array<glm::vec4, MAX_VERTICES> vbo = {
 		glm::vec4(0.0f, 1.0f, left, top),
 		glm::vec4(1.0f, 0.0f, right, bottom),
 		glm::vec4(0.0f, 0.0f, left, bottom),
@@ -289,7 +306,7 @@ SpriteBatch::Instance SpriteBatch::add(const Template& template_ref)
 			if (mInstances.size() < mMaxInstances)
 			{
 				Instance new_instance = { (*sprite_template), mInstances.size() };
-				Transform new_transform = { glm::vec2(0.f), glm::vec2(1.f), 0.0f, (*sprite_template).mTemplateId, glm::vec2(0.f) };
+				Transform new_transform = { glm::vec2(0.f), glm::vec2(1.f), glm::vec2(0.f), (*sprite_template).mTemplateId, 0.0f };
 				mInstances.emplace_back(new_transform);
 				return new_instance;
 			}
