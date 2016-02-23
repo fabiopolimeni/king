@@ -4,3 +4,4 @@
 3. Where distructors are not virtual, the class declaration is by design considered final (not extendible)
 4. Use a sprite batch factory that will potentially allow to render all the sprites with one draw call
 5. Uses of sprite template because all sprites have the same vertex layout, and they only changes in the texture cooridnates
+6. We are limited by the number of uniform binding points. This limitation is no longer if we use shader storage buffers

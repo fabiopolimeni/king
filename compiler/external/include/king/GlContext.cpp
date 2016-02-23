@@ -76,9 +76,15 @@ void CALLBACK DebugCallback(GLenum source, GLenum type, GLuint id,
 
 	if (debType[0] != 0)
 	{
-		char error_msg[256] = { 0 };
+		char error_msg[512] = { 0 };
 		sprintf_s(error_msg, "%s: %s(%s) %d: %s\n", debSource, debType, debSev, id, message);
-		throw std::runtime_error(std::string(error_msg));
+
+		if (strcmp(debType, "error") == 0) {
+			throw std::runtime_error(std::string(error_msg));
+		}
+		else {
+			fprintf(stdout, "%s", error_msg);
+		}
 	}
 }
 

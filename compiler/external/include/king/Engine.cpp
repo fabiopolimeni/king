@@ -26,14 +26,21 @@ namespace King {
 	static const float MaxFrameTicks = 300.0f;
 	static const float TextScale = 0.5f;
 
-	struct Engine::EngineImplementation {
+	struct Engine::Implementation {
 		
 		Sdl mSdl;
 		SdlWindow mSdlWindow;
 		GlContext mGlContext;
 
-		std::unique_ptr<SpriteTexture> mSpriteTextures[Engine::SPRITE_MAX];
-		std::unique_ptr<SpriteBatch> mSpriteBatches[Engine::SPRITE_MAX];
+		std::unique_ptr<SpriteTexture> mTextures[Engine::IMAGE_MAX];
+		std::unique_ptr<SpriteBatch> mBatches[Engine::IMAGE_MAX];
+		std::unique_ptr<SpriteBatch::Template> mTemplates[Engine::SPRITE_MAX];
+
+		std::unique_ptr<SpriteBatch::Instance> mBackground[Engine::GRID_WIDTH * Engine::GRID_HEIGHT];
+		std::unique_ptr<SpriteBatch::Instance> mDiamonds[Engine::GRID_WIDTH * Engine::GRID_HEIGHT];
+		std::unique_ptr<SpriteBatch::Instance> mText[SpriteBatch::MAX_INSTANCES];
+
+		std::unique_ptr<SpriteBatch::Instance> mCell;
 
 		float mElapsedTicks;
 		float mLastFrameSeconds;
@@ -44,7 +51,7 @@ namespace King {
 		float mMouseY;
 		bool mMouseButtonDown;
 		
-		EngineImplementation()
+		Implementation()
 			: mSdl(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_NOPARACHUTE)
 			, mSdlWindow(WindowWidth, WindowHeight)
 			, mGlContext(mSdlWindow)
@@ -60,10 +67,14 @@ namespace King {
 
 		void Start();
 		void ParseEvents();
+
+		void InitSpriteBatches(const std::string & assets_dir);
+		void InitSpriteTemplates();
+		void InitSpriteIntances();
 	};
 
 	Engine::Engine(const char* assetsDirectory)
-		: mPimpl(new EngineImplementation) {
+		: mPimpl(new Implementation) {
 
 		// VSync enabled
 		SDL_GL_SetSwapInterval(1);
@@ -72,32 +83,9 @@ namespace King {
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 		std::string assets_dir(assetsDirectory);
-		std::string texture_files[Engine::SPRITE_MAX] = {
-			assets_dir + "/textures/Cell.dds",
-			assets_dir + "/textures/Diamonds.dds",
-			assets_dir + "/textures/berlin_sans_demi_72_0.dds"
-		};
-
-		std::string vert_shader_file = assets_dir + "/shaders/sprite.vert";
-		std::string frag_shader_file = assets_dir + "/shaders/sprite.frag";
-
-		glm::mat4 projection = glm::ortho(0.0f, float(WindowWidth), float(WindowHeight), 0.0f, -1.0f, 1.0f);
-
-		for (size_t si = 0; si < Engine::SPRITE_MAX; ++si)
-		{
-			auto* sprite_textrue = new SpriteTexture();
-			sprite_textrue->create(texture_files[si].c_str());
-
-			auto* sprite_batch = new SpriteBatch();
-			sprite_batch->init(projection, sprite_textrue->getTexId(),
-				vert_shader_file.c_str(), frag_shader_file.c_str(),
-				SpriteBatch::MAX_TEMPLATES, SpriteBatch::MAX_INSTANCES
-			);
-
-			// Add texture and sprite batch to the managed pointers
-			mPimpl->mSpriteTextures[si].reset(sprite_textrue);
-			mPimpl->mSpriteBatches[si].reset(sprite_batch);
-		}
+		mPimpl->InitSpriteBatches(assets_dir);
+		mPimpl->InitSpriteTemplates();
+		mPimpl->InitSpriteIntances();
 	}
 
 	Engine::~Engine() {
@@ -129,37 +117,18 @@ namespace King {
 		mPimpl->Start();
 	}
 
-	int Engine::GetTextureHeight(Texture texture) const {
-		//return mPimpl->mSdlSurfaceContainer[texture]->Height();
-		return 0;
+	void Engine::Render(Engine::Sprite texture, const glm::mat4& transform) {
+		
+		auto& sprite_batch = mPimpl->mBatches[Engine::IMAGE_BACKGROUND];
+		sprite_batch->updateInstance(*mPimpl->mCell);
+		sprite_batch->flushBuffers();
+		sprite_batch->draw();
 	}
 
-	int Engine::GetTextureWidth(Texture texture) const {
-		//return mPimpl->mSdlSurfaceContainer[texture]->Width();
-		return 0;
-	}
-
-	void Engine::Render(Engine::Texture texture, const glm::mat4& transform) {
-		//glLoadMatrixf(reinterpret_cast<const float*>(&transform));
-
-		//SdlSurface& surface = *mPimpl->mSdlSurfaceContainer[texture];
-
-		//surface.Bind();
-
-		//glBegin(GL_QUADS);
-		//glTexCoord2i(0, 1); glVertex2i(0, surface.Height());
-		//glTexCoord2i(1, 1); glVertex2i(surface.Width(), surface.Height());
-		//glTexCoord2i(1, 0); glVertex2i(surface.Width(), 0);
-		//glTexCoord2i(0, 0); glVertex2i(0, 0);
-		//glEnd();
-	}
-
-	void Engine::Render(Texture texture, float x, float y, float rotation) {
+	void Engine::Render(Sprite texture, float x, float y, float rotation) {
 		glm::mat4 transformation;
 		transformation = glm::translate(transformation, glm::vec3(x, y, 0.0f));
-		if (rotation) {
-			transformation = glm::rotate(transformation, rotation, glm::vec3(0.0f, 0.0f, 1.0f));
-		}
+		transformation = glm::rotate(transformation, rotation, glm::vec3(0.0f, 0.0f, 1.0f));
 
 		Render(texture, transformation);
 	}
@@ -231,7 +200,7 @@ namespace King {
 		return WindowHeight;
 	}
 
-	void Engine::EngineImplementation::Start() {
+	void Engine::Implementation::Start() {
 		while (!mQuit) {
 			SDL_GL_SwapWindow(mSdlWindow);
 
@@ -258,7 +227,51 @@ namespace King {
 		}
 	}
 
-	void Engine::EngineImplementation::ParseEvents() {
+	void Engine::Implementation::InitSpriteBatches(const std::string & assets_dir) {
+		std::string texture_files[Engine::IMAGE_MAX] = {
+			assets_dir + "/textures/Cell.dds",
+			assets_dir + "/textures/Diamonds.dds",
+			assets_dir + "/textures/berlin_sans_demi_72_0.dds"
+		};
+
+		std::string vert_shader_file = assets_dir + "/shaders/sprite.vert";
+		std::string frag_shader_file = assets_dir + "/shaders/sprite.frag";
+
+		glm::mat4 projection = glm::ortho(0.0f, float(WindowWidth), float(WindowHeight), 0.0f, -1.0f, 1.0f);
+
+		// Initialise textures and sprite batches
+		for (size_t si = 0; si < Engine::IMAGE_MAX; ++si)
+		{
+			auto* sprite_textrue = new SpriteTexture();
+			sprite_textrue->create(texture_files[si].c_str());
+
+			auto* sprite_batch = new SpriteBatch();
+			sprite_batch->init(glm::vec2(1.0f/float(WindowWidth), 1.0f/float(WindowHeight)),
+				sprite_textrue->getTexId(),	vert_shader_file.c_str(), frag_shader_file.c_str(),
+				SpriteBatch::MAX_TEMPLATES, SpriteBatch::MAX_INSTANCES);
+
+			// Add texture and sprite batch to the managed pointers
+			mTextures[si].reset(sprite_textrue);
+			mBatches[si].reset(sprite_batch);
+		}
+	}
+
+	void Engine::Implementation::InitSpriteTemplates() {
+		// Generate background template
+		mTemplates[Engine::SPRITE_CELL].reset(new SpriteBatch::Template(
+			mBatches[Engine::IMAGE_BACKGROUND]->createTemplate(
+				glm::vec4(0.f, 1.f, 1.f, 0.f))));
+	}
+
+	void Engine::Implementation::InitSpriteIntances() {
+		// Create an instance for the cell sprite
+		auto& sprite_batch = mBatches[Engine::IMAGE_BACKGROUND];
+		const auto& sprite_template = mTemplates[Engine::SPRITE_CELL];
+		mCell.reset(new SpriteBatch::Instance(
+			sprite_batch->addInstance(*sprite_template)));
+	}
+
+	void Engine::Implementation::ParseEvents() {
 		SDL_Event event;
 		while (SDL_PollEvent(&event)) {
 			switch (event.type) {

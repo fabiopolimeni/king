@@ -1,12 +1,17 @@
 #include "SpriteBatch.hpp"
 #include "ShaderCompiler.hpp"
 #include "OGL.hpp"
+#include "format.hpp"
 
 #include <cassert>
 #include <cmath>
 #include <algorithm>
 #include <memory>
 #include <utility>
+#include <exception>
+
+#define BUFFER_TYPE GL_UNIFORM_BUFFER
+//#define BUFFER_TYPE GL_SHADER_STORAGE_BUFFER
 
 namespace
 {
@@ -37,60 +42,61 @@ namespace
 		return radians * 180.0f / PI;
 	}
 
-	gl::uint32 initUBO(int32_t size, bool dynamic)
+	gl::uint32 initBuffer(gl::enumerator buff_type, int32_t size, bool dynamic)
 	{
-		gl::int32 uniform_buffer_offeset(0);
-		glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &uniform_buffer_offeset);
+		gl::int32 buffer_offeset(0);
+		glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &buffer_offeset);
 
-		gl::int32 max_uniform_buffer_size(0);
-		glGetIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &max_uniform_buffer_size);
+		gl::int32 max_buffer_size(0);
+		glGetIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &max_buffer_size);
 
-		gl::int32 buffer_size = (gl::int32)nextMultipleOf(size, uniform_buffer_offeset);
-		const auto uniform_buffer_size = std::min(buffer_size, max_uniform_buffer_size);
+		gl::int32 required_buffer_size = (gl::int32)nextMultipleOf(size, buffer_offeset);
+		const auto buffer_size = std::min(required_buffer_size, max_buffer_size);
 
-		if (uniform_buffer_size < buffer_size) {
+		if (buffer_size < required_buffer_size) {
 			return 0;
 		}
 
 		gl::uint32 ubo;
 		glGenBuffers(1, &ubo);
-		glBindBuffer(GL_UNIFORM_BUFFER, ubo);
-		glBufferData(GL_UNIFORM_BUFFER, uniform_buffer_size, NULL,
-			dynamic ? GL_DYNAMIC_DRAW : GL_STATIC_DRAW);
-		glBindBuffer(GL_UNIFORM_BUFFER, 0);
+		glBindBuffer(buff_type, ubo);
+
+		auto buffer_usage = dynamic ? GL_DYNAMIC_DRAW : GL_STATIC_DRAW;
+		glBufferData(buff_type, buffer_size, nullptr, buffer_usage);
+		glBindBuffer(buff_type, 0);
 
 		return ubo;
 	}
 
-	void updateUBO(gl::uint32 ubo, uint8_t* buffer, gl::int32 offset, gl::sizei size)
+	void updateBuffer(gl::enumerator buff_type, gl::uint32 ubo, uint8_t* buffer, gl::int32 offset, gl::sizei size)
 	{
 		// uniform buffer object needs to be bound with std140 layout attribute
-		glBindBuffer(GL_UNIFORM_BUFFER, ubo);
-		uint8_t* buffer_ptr = (uint8_t*)glMapBufferRange(GL_UNIFORM_BUFFER, offset,
+		glBindBuffer(buff_type, ubo);
+		uint8_t* buffer_ptr = (uint8_t*)glMapBufferRange(buff_type, offset,
 			size, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
 
 		// copy memory into the buffer
 		memcpy(buffer_ptr, buffer, size);
 
 		// make sure the uniform buffer is uploaded
-		glUnmapBuffer(GL_UNIFORM_BUFFER);
+		glUnmapBuffer(buff_type);
 	}
 
-	void fillUBO(gl::uint32 ubo, uint8_t* buffer, gl::sizei size)
+	void fillBuffer(gl::enumerator buff_type, gl::uint32 ubo, uint8_t* buffer, gl::sizei size)
 	{
 		// uniform buffer object needs to be bound with std140 layout attribute
-		glBindBuffer(GL_UNIFORM_BUFFER, ubo);
-		uint8_t* buffer_ptr = (uint8_t*)glMapBufferRange(GL_UNIFORM_BUFFER, 0,
+		glBindBuffer(buff_type, ubo);
+		uint8_t* buffer_ptr = (uint8_t*)glMapBufferRange(buff_type, 0,
 			size, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
 
 		// copy memory into the buffer
 		memcpy(buffer_ptr, buffer, size);
 
 		// make sure the uniform buffer is uploaded
-		glUnmapBuffer(GL_UNIFORM_BUFFER);
+		glUnmapBuffer(buff_type);
 	}
 
-	void releaseUBO(gl::uint32& ubo)
+	void releaseBuffer(gl::uint32& ubo)
 	{
 		assert(glIsBuffer(ubo));
 		glDeleteBuffers(1, &ubo);
@@ -112,7 +118,7 @@ namespace
 	}
 }
 
-bool SpriteBatch::init(glm::mat4 projection, uint32_t texture_id,
+bool SpriteBatch::init(glm::vec2 win_dims, uint32_t texture_id,
 	const char * vs_source, const char * fs_source,
 	size_t max_templates, size_t max_sprites)
 {
@@ -124,14 +130,14 @@ bool SpriteBatch::init(glm::mat4 projection, uint32_t texture_id,
 	mGraphicsPipe = ShaderCompiler::buildFromFiles(filestages);
 
 	// Create uniform buffers
+	mUBO[eUBO_PROJECTION] = initBuffer(BUFFER_TYPE, sizeof(win_dims), false);
+	fillBuffer(BUFFER_TYPE, mUBO[eUBO_PROJECTION], (uint8_t*)&win_dims[0], sizeof(win_dims));
+
 	mMaxTemplates = max_templates;
-	mUBO[eUBO_TEMPLATE] = initUBO(mMaxTemplates * sizeof(Template::vbo_t), false);
+	mUBO[eUBO_TEMPLATE] = initBuffer(BUFFER_TYPE, mMaxTemplates * Template::VBO_SIZE, false);
 	
 	mMaxInstances = max_sprites;
-	mUBO[eUBO_INSTANCE] = initUBO(mMaxInstances * sizeof(Transform), true);
-
-	mUBO[eUBO_PROJECTION] = initUBO(sizeof(projection), false);
-	fillUBO(mUBO[eUBO_PROJECTION], (uint8_t*)&projection[0], sizeof(projection));
+	mUBO[eUBO_INSTANCE] = initBuffer(BUFFER_TYPE, mMaxInstances * sizeof(Transform), true);
 
 	// Create the vertex array for the draw command
 	mVAO = initVAO();
@@ -146,8 +152,11 @@ bool SpriteBatch::init(glm::mat4 projection, uint32_t texture_id,
 void SpriteBatch::release()
 {
 	mGraphicsPipe.destroy();
-	releaseUBO(mUBO[eUBO_TEMPLATE]);
-	releaseUBO(mUBO[eUBO_INSTANCE]);
+
+	for (size_t ui = 0; ui < eUBO_MAX; ++ui) {
+		releaseBuffer(mUBO[ui]);
+	}
+
 	releaseVAO(mVAO);
 }
 
@@ -159,17 +168,17 @@ void SpriteBatch::fillTemplatesBuffer()
 	}
 
 	const size_t n_templates = mTemplates.size();
-	const size_t buffer_size = n_templates * sizeof(Template::vbo_t);
+	const size_t buffer_size = n_templates * Template::VBO_SIZE;
 	std::unique_ptr<uint8_t> templates_buffer(new uint8_t[buffer_size]);
 
 	for (size_t i = 0; i < n_templates; ++i)
 	{
-		const size_t offset = i * sizeof(Template::vbo_t);
+		const size_t offset = i * Template::VBO_SIZE;
 		memcpy(templates_buffer.get() + offset,
-			mTemplates[i].mVBO.data(), sizeof(Template::vbo_t));
+			mTemplates[i].mVBO, Template::VBO_SIZE);
 	}
 
-	fillUBO(mUBO[eUBO_TEMPLATE], templates_buffer.get(), buffer_size);
+	fillBuffer(BUFFER_TYPE, mUBO[eUBO_TEMPLATE], templates_buffer.get(), buffer_size);
 	
 	// Clear pending templates
 	while (!mPendingTemplates.empty()) {
@@ -195,7 +204,7 @@ void SpriteBatch::fillInstancesBuffer()
 			&mInstances[i], sizeof(Transform));
 	}
 
-	fillUBO(mUBO[eUBO_INSTANCE], instances_buffer.get(), buffer_size);
+	fillBuffer(BUFFER_TYPE, mUBO[eUBO_INSTANCE], instances_buffer.get(), buffer_size);
 
 	// Clear pending instance transforms
 	while (!mPendingInstances.empty()) {
@@ -203,7 +212,7 @@ void SpriteBatch::fillInstancesBuffer()
 	}
 }
 
-void SpriteBatch::flush()
+void SpriteBatch::flushBuffers()
 {
 	// Update pending templates
 	fillTemplatesBuffer();
@@ -217,10 +226,10 @@ void SpriteBatch::draw() const
 	// bind shader programs
 	glBindProgramPipeline(mGraphicsPipe.getPipeId());
 
-	// bind uniform buffers
-	glBindBufferBase(GL_UNIFORM_BUFFER, Uniform::eUBO_TEMPLATE, mUBO[Uniform::eUBO_TEMPLATE]);
-	glBindBufferBase(GL_UNIFORM_BUFFER, Uniform::eUBO_INSTANCE, mUBO[Uniform::eUBO_INSTANCE]);
-	glBindBufferBase(GL_UNIFORM_BUFFER, Uniform::eUBO_PROJECTION, mUBO[Uniform::eUBO_PROJECTION]);
+	// bind buffers
+	for (gl::uint32 ui = 0; ui < eUBO_MAX; ++ui) {
+		glBindBufferBase(BUFFER_TYPE, ui, mUBO[ui]);
+	}
 
 	// bind texture
 	glBindTextures(0, 1, &mTexId);
@@ -233,14 +242,14 @@ void SpriteBatch::draw() const
 }
 
 SpriteBatch::Template SpriteBatch::Template::INVALID = {
-	std::array<glm::vec4, MAX_VERTICES>(), INDEX_NONE
+	nullptr, INDEX_NONE
 };
 
 SpriteBatch::Instance SpriteBatch::Instance::INVALID = {
 	SpriteBatch::Template::INVALID, INDEX_NONE
 };
 
-bool SpriteBatch::update(const Instance & instance_ref, glm::vec2 position, glm::vec2 scale, float rotation)
+bool SpriteBatch::updateInstance(const Instance & instance_ref, glm::vec2 position, glm::vec2 scale, float rotation)
 {
 	if (instance_ref.isValid() && mInstances.size() > instance_ref.mInstanceId)
 	{
@@ -258,7 +267,7 @@ bool SpriteBatch::update(const Instance & instance_ref, glm::vec2 position, glm:
 	return false;
 }
 
-SpriteBatch::Template SpriteBatch::create(glm::vec4 atlas_offsets)
+const SpriteBatch::Template& SpriteBatch::createTemplate(glm::vec4 atlas_offsets)
 {
 	float left = atlas_offsets.x;
 	float top = atlas_offsets.y;
@@ -267,7 +276,7 @@ SpriteBatch::Template SpriteBatch::create(glm::vec4 atlas_offsets)
 
 	// Interleaved array of vertex
 	// positions and texture coordinates
-	const std::array<glm::vec4, MAX_VERTICES> vbo = {
+	const glm::vec4 vbo[MAX_VERTICES] = {
 		glm::vec4(0.0f, 1.0f, left, top),
 		glm::vec4(1.0f, 0.0f, right, bottom),
 		glm::vec4(0.0f, 0.0f, left, bottom),
@@ -280,16 +289,16 @@ SpriteBatch::Template SpriteBatch::create(glm::vec4 atlas_offsets)
 	// we can't add more than the maximum templates
 	if (mTemplates.size() < mMaxTemplates)
 	{
-		Template new_template = { vbo, mTemplates.size() };
-		mTemplates.emplace_back(new_template);
-		mPendingTemplates.emplace(new_template.mTemplateId);
-		return new_template;
+		Template new_template(vbo, mTemplates.size());
+		mTemplates.push_back(new_template);
+		mPendingTemplates.emplace(mTemplates.back().mTemplateId);
+		return mTemplates.back();
 	}
 
 	return SpriteBatch::Template::INVALID;
 }
 
-SpriteBatch::Instance SpriteBatch::add(const Template& template_ref)
+const SpriteBatch::Instance SpriteBatch::addInstance(const Template& template_ref)
 {
 	if (template_ref.isValid())
 	{
@@ -305,10 +314,16 @@ SpriteBatch::Instance SpriteBatch::add(const Template& template_ref)
 			// we can't add more than the maximum instances
 			if (mInstances.size() < mMaxInstances)
 			{
-				Instance new_instance = { (*sprite_template), mInstances.size() };
-				Transform new_transform = { glm::vec2(0.f), glm::vec2(1.f), glm::vec2(0.f), (*sprite_template).mTemplateId, 0.0f };
-				mInstances.emplace_back(new_transform);
-				return new_instance;
+				Transform new_transform = {
+					glm::vec2(0.f),						// Position
+					glm::vec2(1.f),						// Scale
+					glm::vec2(sin(0.f), cos(0.f)),		// Rotation
+					template_ref.mTemplateId,			// Reference
+					0.0f								// Reserved
+				};
+
+				mInstances.push_back(new_transform);
+				return{ template_ref, mInstances.size() - 1 };
 			}
 		}
 	}

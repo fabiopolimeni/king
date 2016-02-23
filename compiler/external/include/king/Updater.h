@@ -2,13 +2,17 @@
 
 #pragma once
 
-namespace King {
+namespace King
+{
 	struct Input;
-
-	class Updater {
+	class Updater
+	{
 	public:
+
 		virtual void Update() = 0;
+
 	protected:
+
 		~Updater() {}
 	};
 }

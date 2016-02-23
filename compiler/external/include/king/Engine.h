@@ -9,23 +9,27 @@ namespace King {
 	class Updater;
 	class Engine {
 	public:
-		enum Texture {
-			TEXTURE_BACKGROUND,
-			TEXTURE_BLUE,
-			TEXTURE_GREEN,
-			TEXTURE_PURPLE,
-			TEXTURE_RED,
-			TEXTURE_YELLOW,
-			TEXTURE_MAX
-		};
 
-		enum Sprite
-		{
-			SPRITE_DIAMONDS,
-			SPRITE_TEXT,
-			SPRITE_BACKGROUND,
+		enum Sprite {
+			SPRITE_CELL,
+			SPRITE_BLUE,
+			SPRITE_GREEN,
+			SPRITE_PURPLE,
+			SPRITE_RED,
+			SPRITE_YELLOW,
 			SPRITE_MAX
 		};
+
+		enum Image
+		{
+			IMAGE_BACKGROUND,
+			IMAGE_DIAMONDS,
+			IMAGE_TEXT,
+			IMAGE_MAX
+		};
+
+		const static size_t GRID_WIDTH = 8;
+		const static size_t GRID_HEIGHT = 8;
 
 		Engine(const char* assetsDirectory);
 		~Engine();
@@ -38,13 +42,9 @@ namespace King {
 		void Start(Updater& updater);
 		void Quit();
 
-		int GetTextureHeight(Texture texture) const;
-		int GetTextureWidth(Texture texture) const;
-		void Render(Texture texture, const glm::mat4& transform);
-		void Render(Texture texture, float x, float y, float rotation = 0.0f);
+		void Render(Sprite texture, const glm::mat4& transform);
+		void Render(Sprite texture, float x, float y, float rotation = 0.0f);
 
-
-		float CalculateStringWidth(const char* text) const;
 		void Write(const char* text, const glm::mat4& transform);
 		void Write(const char* text, float x, float y, float rotation = 0.0f);
 
@@ -52,7 +52,10 @@ namespace King {
 		int GetHeight() const;
 
 	private:
-		struct EngineImplementation;
-		std::unique_ptr<EngineImplementation> mPimpl;
+
+		float CalculateStringWidth(const char* text) const;
+
+		struct Implementation;
+		std::unique_ptr<Implementation> mPimpl;
 	};
 }

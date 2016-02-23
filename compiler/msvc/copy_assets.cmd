@@ -1,1 +1,2 @@
-robocopy ../../assets ../bin/assets /MIR
+call robocopy ../../assets ../bin/assets /MIR
+exit 0
