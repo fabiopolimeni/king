@@ -11,7 +11,7 @@
 
 precision highp float;
 
-layout(std140, row_major) uniform;
+layout(std140, column_major) uniform;
 layout(std430, column_major) buffer;
 
 layout(binding = UBO_PROJECTION) uniform Matrix
