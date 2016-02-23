@@ -3,6 +3,9 @@
 #include "OGL.hpp"
 #include "format.hpp"
 
+#include <glm/vec3.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
 #include <cassert>
 #include <cmath>
 #include <algorithm>
@@ -118,7 +121,7 @@ namespace
 	}
 }
 
-bool SpriteBatch::init(glm::vec2 win_dims, uint32_t texture_id,
+bool SpriteBatch::init(glm::mat4 projection, uint32_t texture_id,
 	const char * vs_source, const char * fs_source,
 	size_t max_templates, size_t max_sprites)
 {
@@ -130,14 +133,15 @@ bool SpriteBatch::init(glm::vec2 win_dims, uint32_t texture_id,
 	mGraphicsPipe = ShaderCompiler::buildFromFiles(filestages);
 
 	// Create uniform buffers
-	mUBO[eUBO_PROJECTION] = initBuffer(BUFFER_TYPE, sizeof(win_dims), false);
-	fillBuffer(BUFFER_TYPE, mUBO[eUBO_PROJECTION], (uint8_t*)&win_dims[0], sizeof(win_dims));
+	mUBO[eUBO_PROJECTION] = initBuffer(BUFFER_TYPE, sizeof(projection), false);
+	fillBuffer(BUFFER_TYPE, mUBO[eUBO_PROJECTION], (uint8_t*)&projection[0], sizeof(projection));
 
 	mMaxTemplates = max_templates;
 	mUBO[eUBO_TEMPLATE] = initBuffer(BUFFER_TYPE, mMaxTemplates * Template::VBO_SIZE, false);
 	
 	mMaxInstances = max_sprites;
-	mUBO[eUBO_INSTANCE] = initBuffer(BUFFER_TYPE, mMaxInstances * sizeof(Transform), true);
+	mUBO[eUBO_INSTANCE] = initBuffer(BUFFER_TYPE, mMaxInstances * sizeof(Instance), true);
+	mUBO[eUBO_TRANSFORM] = initBuffer(BUFFER_TYPE, mMaxInstances * sizeof(Transform), true);
 
 	// Create the vertex array for the draw command
 	mVAO = initVAO();
@@ -193,18 +197,37 @@ void SpriteBatch::fillInstancesBuffer()
 		return;
 	}
 
-	const size_t n_instances = mInstances.size();
-	const size_t buffer_size = n_instances * sizeof(Transform);
-	std::unique_ptr<uint8_t> instances_buffer(new uint8_t[buffer_size]);
-
-	for (size_t i = 0; i < n_instances; ++i)
+	// Update instances buffer
 	{
-		const size_t offset = i * sizeof(Transform);
-		memcpy(instances_buffer.get() + offset,
-			&mInstances[i], sizeof(Transform));
+		const size_t elem_size = sizeof(Instance);
+		const size_t n_instances = mInstances.size();
+		const size_t instance_buffer_size = n_instances * elem_size;
+		std::unique_ptr<uint8_t> instance_buffer(new uint8_t[instance_buffer_size]);
+
+		for (size_t i = 0; i < n_instances; ++i)
+		{
+			const size_t offset = i * elem_size;
+			memcpy(instance_buffer.get() + offset, mInstances[i].get(), elem_size);
+		}
+
+		fillBuffer(BUFFER_TYPE, mUBO[eUBO_INSTANCE], instance_buffer.get(), instance_buffer_size);
 	}
 
-	fillBuffer(BUFFER_TYPE, mUBO[eUBO_INSTANCE], instances_buffer.get(), buffer_size);
+	// Update transform buffer
+	{
+		const size_t elem_size = sizeof(Transform);
+		const size_t n_transform = mTransforms.size();
+		const size_t transform_buffer_size = n_transform * elem_size;
+		std::unique_ptr<uint8_t> transform_buffer(new uint8_t[transform_buffer_size]);
+
+		for (size_t i = 0; i < n_transform; ++i)
+		{
+			const size_t offset = i * elem_size;
+			memcpy(transform_buffer.get() + offset, &mTransforms[i], elem_size);
+		}
+
+		fillBuffer(BUFFER_TYPE, mUBO[eUBO_TRANSFORM], transform_buffer.get(), transform_buffer_size);
+	}
 
 	// Clear pending instance transforms
 	while (!mPendingInstances.empty()) {
@@ -238,7 +261,7 @@ void SpriteBatch::draw() const
 	glBindVertexArray(mVAO);
 
 	// buffer vertex count
-	glDrawArraysInstanced(GL_TRIANGLES, 0, MAX_VERTICES, mInstances.size());
+	glDrawArraysInstanced(GL_TRIANGLES, 0, MAX_VERTICES, mTransforms.size());
 }
 
 SpriteBatch::Template SpriteBatch::Template::INVALID = {
@@ -246,26 +269,8 @@ SpriteBatch::Template SpriteBatch::Template::INVALID = {
 };
 
 SpriteBatch::Instance SpriteBatch::Instance::INVALID = {
-	SpriteBatch::Template::INVALID, INDEX_NONE
+	INDEX_NONE, INDEX_NONE
 };
-
-bool SpriteBatch::updateInstance(const Instance & instance_ref, glm::vec2 position, glm::vec2 scale, float rotation)
-{
-	if (instance_ref.isValid() && mInstances.size() > instance_ref.mInstanceId)
-	{
-		mInstances[instance_ref.mInstanceId].mPos = position;
-		mInstances[instance_ref.mInstanceId].mScale = scale;
-		
-		// Store sin and cos respectively in x and y of the rotation vector
-		float theta = deg2Rad(rotation);
-		mInstances[instance_ref.mInstanceId].mRot = glm::vec2(sin(theta), cos(theta));
-
-		mPendingInstances.emplace(instance_ref.mInstanceId);
-		return true;
-	}
-
-	return false;
-}
 
 const SpriteBatch::Template& SpriteBatch::createTemplate(glm::vec4 atlas_offsets)
 {
@@ -298,7 +303,7 @@ const SpriteBatch::Template& SpriteBatch::createTemplate(glm::vec4 atlas_offsets
 	return SpriteBatch::Template::INVALID;
 }
 
-const SpriteBatch::Instance SpriteBatch::addInstance(const Template& template_ref)
+std::shared_ptr<SpriteBatch::Instance> SpriteBatch::addInstance(const Template& template_ref)
 {
 	if (template_ref.isValid())
 	{
@@ -312,22 +317,41 @@ const SpriteBatch::Instance SpriteBatch::addInstance(const Template& template_re
 		if (sprite_template != std::end(mTemplates))
 		{
 			// we can't add more than the maximum instances
-			if (mInstances.size() < mMaxInstances)
+			if (mTransforms.size() < mMaxInstances)
 			{
-				Transform new_transform = {
-					glm::vec2(0.f),						// Position
-					glm::vec2(1.f),						// Scale
-					glm::vec2(sin(0.f), cos(0.f)),		// Rotation
-					template_ref.mTemplateId,			// Reference
-					0.0f								// Reserved
-				};
-
-				mInstances.push_back(new_transform);
-				return{ template_ref, mInstances.size() - 1 };
+				mInstances.push_back(std::make_shared<Instance>(template_ref.mTemplateId, mTransforms.size()));
+				mTransforms.push_back(glm::mat4(1.0f));
+				return mInstances.back();
 			}
 		}
 	}
 
 	// return an invalid object
-	return SpriteBatch::Instance::INVALID;
+	return std::make_shared<Instance>(SpriteBatch::Instance::INVALID);
+}
+
+bool SpriteBatch::updateInstance(const std::shared_ptr<Instance>& instance_ref, glm::vec2 position, glm::vec2 scale, float rotation)
+{
+	Instance* instance_ptr = instance_ref.get();
+	if (instance_ptr->isValid() && mTransforms.size() > instance_ptr->mTransformId)
+	{
+		glm::mat4 model;
+
+		// Rotate around the centre
+		model = glm::translate(model, glm::vec3(position, 0.0f));
+		model = glm::translate(model, glm::vec3(0.5f * scale.x, 0.5f * scale.y, 0.0f));
+		model = glm::rotate(model, rotation, glm::vec3(0.0f, 0.0f, 1.0f));
+		model = glm::translate(model, glm::vec3(-0.5f * scale.x, -0.5f * scale.y, 0.0f));
+		model = glm::scale(model, glm::vec3(scale, 1.0f));
+
+		mTransforms[instance_ptr->mTransformId] = model;
+		mPendingInstances.emplace(instance_ptr->mTransformId);
+		return true;
+	}
+
+	return false;
+}
+
+void SpriteBatch::removeInstance(const std::shared_ptr<Instance>& sprite_ref)
+{
 }

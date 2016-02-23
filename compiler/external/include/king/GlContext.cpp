@@ -118,6 +118,8 @@ namespace King {
 			glDebugMessageCallback(&DebugCallback, this);
 		}
 
+		glEnable(GL_MULTISAMPLE);
+
 		CheckError("OpenGL context create");
 	}
 	

@@ -36,11 +36,11 @@ namespace King {
 		std::unique_ptr<SpriteBatch> mBatches[Engine::IMAGE_MAX];
 		std::unique_ptr<SpriteBatch::Template> mTemplates[Engine::SPRITE_MAX];
 
-		std::unique_ptr<SpriteBatch::Instance> mBackground[Engine::GRID_WIDTH * Engine::GRID_HEIGHT];
-		std::unique_ptr<SpriteBatch::Instance> mDiamonds[Engine::GRID_WIDTH * Engine::GRID_HEIGHT];
-		std::unique_ptr<SpriteBatch::Instance> mText[SpriteBatch::MAX_INSTANCES];
+		std::shared_ptr<SpriteBatch::Instance> mBackground[Engine::GRID_WIDTH * Engine::GRID_HEIGHT];
+		std::shared_ptr<SpriteBatch::Instance> mDiamonds[Engine::GRID_WIDTH * Engine::GRID_HEIGHT];
+		std::shared_ptr<SpriteBatch::Instance> mText[SpriteBatch::MAX_INSTANCES];
 
-		std::unique_ptr<SpriteBatch::Instance> mCell;
+		std::shared_ptr<SpriteBatch::Instance> mCell;
 
 		float mElapsedTicks;
 		float mLastFrameSeconds;
@@ -120,7 +120,12 @@ namespace King {
 	void Engine::Render(Engine::Sprite texture, const glm::mat4& transform) {
 		
 		auto& sprite_batch = mPimpl->mBatches[Engine::IMAGE_BACKGROUND];
-		sprite_batch->updateInstance(*mPimpl->mCell);
+		
+		size_t sprte_size = 64;
+		auto sprite_position = glm::vec2((WindowWidth - sprte_size)*0.5f, (WindowHeight - sprte_size)*0.5);
+		auto sprite_rotation = 45.f;
+
+		sprite_batch->updateInstance(mPimpl->mCell, sprite_position, glm::vec2(float(sprte_size)), sprite_rotation);
 		sprite_batch->flushBuffers();
 		sprite_batch->draw();
 	}
@@ -205,7 +210,7 @@ namespace King {
 			SDL_GL_SwapWindow(mSdlWindow);
 
 			static float depth_value = 1.0f;
-			static glm::vec4 view_color(.95f);
+			static glm::vec4 view_color(.35f);
 			glClearBufferfv(GL_DEPTH, 0, &depth_value);
 			glClearBufferfv(GL_COLOR, 0, &view_color[0]);
 
@@ -237,7 +242,7 @@ namespace King {
 		std::string vert_shader_file = assets_dir + "/shaders/sprite.vert";
 		std::string frag_shader_file = assets_dir + "/shaders/sprite.frag";
 
-		glm::mat4 projection = glm::ortho(0.0f, float(WindowWidth), float(WindowHeight), 0.0f, -1.0f, 1.0f);
+		glm::mat4 projection = glm::ortho(0.0f, static_cast<float>(WindowWidth), 0.0f, static_cast<float>(WindowHeight), -1.0f, 1.0f);
 
 		// Initialise textures and sprite batches
 		for (size_t si = 0; si < Engine::IMAGE_MAX; ++si)
@@ -246,8 +251,8 @@ namespace King {
 			sprite_textrue->create(texture_files[si].c_str());
 
 			auto* sprite_batch = new SpriteBatch();
-			sprite_batch->init(glm::vec2(1.0f/float(WindowWidth), 1.0f/float(WindowHeight)),
-				sprite_textrue->getTexId(),	vert_shader_file.c_str(), frag_shader_file.c_str(),
+			sprite_batch->init(projection, sprite_textrue->getTexId(),
+				vert_shader_file.c_str(), frag_shader_file.c_str(),
 				SpriteBatch::MAX_TEMPLATES, SpriteBatch::MAX_INSTANCES);
 
 			// Add texture and sprite batch to the managed pointers
@@ -267,8 +272,7 @@ namespace King {
 		// Create an instance for the cell sprite
 		auto& sprite_batch = mBatches[Engine::IMAGE_BACKGROUND];
 		const auto& sprite_template = mTemplates[Engine::SPRITE_CELL];
-		mCell.reset(new SpriteBatch::Instance(
-			sprite_batch->addInstance(*sprite_template)));
+		mCell = sprite_batch->addInstance(*sprite_template);
 	}
 
 	void Engine::Implementation::ParseEvents() {

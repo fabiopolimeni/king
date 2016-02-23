@@ -8,6 +8,7 @@
 
 #include <vector>
 #include <queue>
+#include <memory>
 
 class SpriteBatch
 {
@@ -24,6 +25,7 @@ public:
 		eUBO_PROJECTION,
 		eUBO_TEMPLATE,
 		eUBO_INSTANCE,
+		eUBO_TRANSFORM,
 		eUBO_MAX
 	};
 
@@ -35,7 +37,7 @@ public:
 		static Template INVALID;
 		static const size_t VBO_SIZE = sizeof(glm::vec4) * MAX_VERTICES;
 
-		bool isValid() const {
+		inline bool isValid() const {
 			return mTemplateId != INDEX_NONE;
 		}
 
@@ -53,17 +55,22 @@ public:
 	// user to modify it directly.
 	struct Instance
 	{
-		const Template&	mTemplate;
-		const size_t	mInstanceId;
+		const size_t	mTemplateId;
+		const size_t	mTransformId;
 
 		static Instance INVALID;
 
-		bool isValid() const {
-			return mTemplate.isValid() && mInstanceId != INDEX_NONE;
+		inline bool isValid() const {
+			return mTemplateId != INDEX_NONE && mTransformId != INDEX_NONE;
+		}
+
+		inline Instance(const size_t template_id, const size_t transform_id)
+			: mTemplateId(template_id), mTransformId(transform_id)
+		{
 		}
 	};
 
-	bool init(glm::vec2 win_dims, uint32_t texture_id,
+	bool init(glm::mat4 projection, uint32_t texture_id,
 		const char* vs_source, const char* fs_source,
 		size_t max_templates, size_t max_sprites);
 
@@ -75,10 +82,13 @@ public:
 
 	// Add an instance of template to the sprite's batch
 	// @return The ref index of the instance, SpriteKey.mTemplate == null otherwise
-	const Instance addInstance(const Template& template_ref);
+	std::shared_ptr<Instance> addInstance(const Template& template_ref);
+
+	// Remove the instance from the set and decrement the control pointer
+	void removeInstance(const std::shared_ptr<Instance>& sprite_ref);
 
 	// Update instance transform
-	bool updateInstance(const Instance& sprite_ref,
+	bool updateInstance(const std::shared_ptr<Instance>& sprite_ref,
 		glm::vec2 position = glm::vec2(0.f),
 		glm::vec2 scale = glm::vec2(1.f),
 		float rotation = 0.f);
@@ -91,16 +101,6 @@ public:
 
 private:
 
-	struct Transform
-	{
-		glm::vec2			mPos;
-		glm::vec2			mScale;
-		glm::vec2			mRot;
-
-		const glm::uint32	mTemplateId;
-		const glm::float32	mPad;
-	};
-
 	GraphicsPipeline mGraphicsPipe;
 
 	uint32_t	mTexId;
@@ -111,8 +111,11 @@ private:
 	size_t	mMaxTemplates;
 	size_t	mMaxInstances;
 
-	std::vector<Template>	mTemplates;
-	std::vector<Transform>	mInstances;
+	typedef glm::mat4 Transform;
+
+	std::vector<Template>					mTemplates;
+	std::vector<Transform>					mTransforms;
+	std::vector<std::shared_ptr<Instance>>	mInstances;
 
 	// Dirty templates and instances
 	std::queue<size_t>	mPendingTemplates;
