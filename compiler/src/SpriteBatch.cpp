@@ -57,7 +57,9 @@ namespace
 		const auto buffer_size = std::min(required_buffer_size, max_buffer_size);
 
 		if (buffer_size < required_buffer_size) {
-			return 0;
+			throw std::runtime_error(fmt::format(
+				"Cannot create buffer of size {} bytes, maximum allowed {} bytes\n",
+				required_buffer_size, max_buffer_size));
 		}
 
 		gl::uint32 ubo;
@@ -141,7 +143,7 @@ bool SpriteBatch::init(glm::mat4 projection, uint32_t texture_id,
 	
 	mMaxInstances = max_sprites;
 	mUBO[eUBO_INSTANCE] = initBuffer(BUFFER_TYPE, mMaxInstances * sizeof(Instance), true);
-	mUBO[eUBO_TRANSFORM] = initBuffer(BUFFER_TYPE, mMaxInstances * sizeof(Transform), true);
+	mUBO[eUBO_DATA] = initBuffer(BUFFER_TYPE, mMaxInstances * sizeof(Data), true);
 
 	// Create the vertex array for the draw command
 	mVAO = initVAO();
@@ -167,7 +169,7 @@ void SpriteBatch::release()
 void SpriteBatch::fillTemplatesBuffer()
 {
 	// Refill the whole buffer with new data
-	if (mPendingTemplates.empty()) {
+	if (!bDirtyTemplates) {
 		return;
 	}
 
@@ -183,17 +185,13 @@ void SpriteBatch::fillTemplatesBuffer()
 	}
 
 	fillBuffer(BUFFER_TYPE, mUBO[eUBO_TEMPLATE], templates_buffer.get(), buffer_size);
-	
-	// Clear pending templates
-	while (!mPendingTemplates.empty()) {
-		mPendingTemplates.pop();
-	}
+	bDirtyTemplates = false;
 }
 
 void SpriteBatch::fillInstancesBuffer()
 {
 	// Refill the whole buffer with new data
-	if (mPendingInstances.empty()) {
+	if (!bDirtyInstances) {
 		return;
 	}
 
@@ -215,24 +213,21 @@ void SpriteBatch::fillInstancesBuffer()
 
 	// Update transform buffer
 	{
-		const size_t elem_size = sizeof(Transform);
-		const size_t n_transform = mTransforms.size();
+		const size_t elem_size = sizeof(Data);
+		const size_t n_transform = mData.size();
 		const size_t transform_buffer_size = n_transform * elem_size;
 		std::unique_ptr<uint8_t> transform_buffer(new uint8_t[transform_buffer_size]);
 
 		for (size_t i = 0; i < n_transform; ++i)
 		{
 			const size_t offset = i * elem_size;
-			memcpy(transform_buffer.get() + offset, &mTransforms[i], elem_size);
+			memcpy(transform_buffer.get() + offset, &mData[i], elem_size);
 		}
 
-		fillBuffer(BUFFER_TYPE, mUBO[eUBO_TRANSFORM], transform_buffer.get(), transform_buffer_size);
+		fillBuffer(BUFFER_TYPE, mUBO[eUBO_DATA], transform_buffer.get(), transform_buffer_size);
 	}
 
-	// Clear pending instance transforms
-	while (!mPendingInstances.empty()) {
-		mPendingInstances.pop();
-	}
+	bDirtyInstances = false;
 }
 
 void SpriteBatch::flushBuffers()
@@ -261,7 +256,7 @@ void SpriteBatch::draw() const
 	glBindVertexArray(mVAO);
 
 	// buffer vertex count
-	glDrawArraysInstanced(GL_TRIANGLES, 0, MAX_VERTICES, mTransforms.size());
+	glDrawArraysInstanced(GL_TRIANGLES, 0, MAX_VERTICES, mData.size());
 }
 
 SpriteBatch::Template SpriteBatch::Template::INVALID = {
@@ -296,7 +291,8 @@ const SpriteBatch::Template& SpriteBatch::createTemplate(glm::vec4 atlas_offsets
 	{
 		Template new_template(vbo, mTemplates.size());
 		mTemplates.push_back(new_template);
-		mPendingTemplates.emplace(mTemplates.back().mTemplateId);
+
+		bDirtyTemplates = true;
 		return mTemplates.back();
 	}
 
@@ -317,10 +313,12 @@ std::shared_ptr<SpriteBatch::Instance> SpriteBatch::addInstance(const Template& 
 		if (sprite_template != std::end(mTemplates))
 		{
 			// we can't add more than the maximum instances
-			if (mTransforms.size() < mMaxInstances)
+			if (mData.size() < mMaxInstances)
 			{
-				mInstances.push_back(std::make_shared<Instance>(template_ref.mTemplateId, mTransforms.size()));
-				mTransforms.push_back({ glm::mat4(1.0f), glm::vec4(1.0f) });
+				mInstances.push_back(std::make_shared<Instance>(template_ref.mTemplateId, mData.size()));
+				mData.push_back({ glm::mat4(1.0f), glm::vec4(1.0f) });
+
+				bDirtyInstances = true;
 				return mInstances.back();
 			}
 		}
@@ -334,22 +332,22 @@ bool SpriteBatch::updateInstance(const std::shared_ptr<Instance>& instance_ref,
 	glm::vec2 position, glm::vec2 scale, glm::vec4 color, float rotation)
 {
 	Instance* instance_ptr = instance_ref.get();
-	const auto data_id = instance_ptr->mTransformId;
-	if (instance_ptr->isValid() && mTransforms.size() > data_id)
+	const auto data_id = instance_ptr->mDataId;
+	if (instance_ptr->isValid() && mData.size() > data_id)
 	{
 		glm::mat4 model;
 
-		// Rotate around the centre
+		// rotate around the centre
 		model = glm::translate(model, glm::vec3(position, 0.0f));
 		model = glm::translate(model, glm::vec3(0.5f * scale.x, 0.5f * scale.y, 0.0f));
 		model = glm::rotate(model, rotation, glm::vec3(0.0f, 0.0f, 1.0f));
 		model = glm::translate(model, glm::vec3(-0.5f * scale.x, -0.5f * scale.y, 0.0f));
 		model = glm::scale(model, glm::vec3(scale, 1.0f));
 
-		mTransforms[data_id].mTransform = model;
-		mTransforms[data_id].mColor = color;
+		mData[data_id].mTransform = model;
+		mData[data_id].mColor = color;
 
-		mPendingInstances.emplace(instance_ptr->mTransformId);
+		bDirtyInstances = true;
 		return true;
 	}
 
@@ -358,4 +356,37 @@ bool SpriteBatch::updateInstance(const std::shared_ptr<Instance>& instance_ref,
 
 void SpriteBatch::removeInstance(const std::shared_ptr<Instance>& sprite_ref)
 {
+	// find this reference in the list of our instances
+	auto instance = std::find(mInstances.begin(), mInstances.end(), sprite_ref);
+	if (instance != std::end(mInstances))
+	{
+		assert((*instance)->isValid());
+		assert((*instance) == mInstances[(*instance)->mDataId]);
+		assert((*instance)->mDataId < mData.size());
+		assert(mData.size() == mInstances.size());
+
+		// swap the instance pointed by Instance::mDataId
+		// in the data array with last one
+		auto data_id = (*instance)->mDataId;
+		auto swap_id = mData.size() - 1;
+		
+		// swap algorithm only if not last instance
+		if (data_id != swap_id)
+		{
+			// swap data
+			mData[data_id] = mData[swap_id];
+
+			// swap instances
+			mInstances[data_id] = mInstances[swap_id];
+
+			// force instance to update its data reference
+			mInstances[data_id]->mDataId = data_id;
+		}
+
+		// pop from data and instance from the lists
+		mData.pop_back();
+		mInstances.pop_back();
+
+		bDirtyInstances = true;
+	}
 }

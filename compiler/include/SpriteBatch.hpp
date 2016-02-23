@@ -25,7 +25,7 @@ public:
 		eUBO_PROJECTION,
 		eUBO_TEMPLATE,
 		eUBO_INSTANCE,
-		eUBO_TRANSFORM,
+		eUBO_DATA,
 		eUBO_MAX
 	};
 
@@ -50,24 +50,25 @@ public:
 		}
 	};
 
-	// This doesn't store the transform
-	// by design, as we don't want the
-	// user to modify it directly.
+	// This doesn't store the transform by design,
+	// as we don't want the user to modify it directly.
 	struct Instance
 	{
-		const size_t	mTemplateId;
-		const size_t	mTransformId;
-
 		static Instance INVALID;
 
 		inline bool isValid() const {
-			return mTemplateId != INDEX_NONE && mTransformId != INDEX_NONE;
+			return mTemplateId != INDEX_NONE && mDataId != INDEX_NONE;
 		}
 
 		inline Instance(const size_t template_id, const size_t transform_id)
-			: mTemplateId(template_id), mTransformId(transform_id)
-		{
+			: mTemplateId(template_id), mDataId(transform_id) {
 		}
+
+	private:
+
+		friend class SpriteBatch;
+		const size_t	mTemplateId;
+			  size_t	mDataId;
 	};
 
 	bool init(glm::mat4 projection, uint32_t texture_id,
@@ -111,19 +112,21 @@ private:
 	size_t	mMaxTemplates;
 	size_t	mMaxInstances;
 
-	struct Transform
+	struct Data
 	{
 		glm::mat4 mTransform;
 		glm::vec4 mColor;
 	};
 
 	std::vector<Template>					mTemplates;
-	std::vector<Transform>					mTransforms;
+	std::vector<Data>						mData;
 	std::vector<std::shared_ptr<Instance>>	mInstances;
 
-	// Dirty templates and instances
-	std::queue<size_t>	mPendingTemplates;
-	std::queue<size_t>	mPendingInstances;
+	// Dirty templates and instances flags
+	// These will be caught next time flushBuffer() is called
+	// which, in turn will update the relevant buffers
+	uint8_t	bDirtyTemplates : 1;
+	uint8_t bDirtyInstances : 1;
 
 	void fillTemplatesBuffer();
 	void fillInstancesBuffer();
