@@ -12,26 +12,26 @@ namespace King {
 
 		enum Sprite {
 			SPRITE_CELL,
+			SPRITE_CHAR,
 			SPRITE_BLUE,
 			SPRITE_GREEN,
 			SPRITE_PURPLE,
 			SPRITE_RED,
 			SPRITE_YELLOW,
+			SPRITE_CYAN,
+			SPRITE_BLACK,
+			SPRITE_WHITE,
 			SPRITE_MAX
 		};
 
-		enum Image
-		{
+		enum Image {
 			IMAGE_BACKGROUND,
 			IMAGE_DIAMONDS,
 			IMAGE_TEXT,
 			IMAGE_MAX
 		};
 
-		const static size_t GRID_WIDTH = 8;
-		const static size_t GRID_HEIGHT = 8;
-
-		Engine(const char* assetsDirectory);
+		Engine(const char* assets_directory);
 		~Engine();
 
 		float GetLastFrameSeconds() const;
@@ -48,8 +48,10 @@ namespace King {
 		void Write(const char* text, const glm::mat4& transform);
 		void Write(const char* text, float x, float y, float rotation = 0.0f);
 
-		int GetWidth() const;
-		int GetHeight() const;
+		bool UpdateGrid(size_t x, size_t y,	glm::vec2 scale, glm::vec4 color, float rotation);
+
+		int GetWindowWidth() const;
+		int GetWindowHeight() const;
 
 	private:
 

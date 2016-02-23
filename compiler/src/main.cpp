@@ -7,14 +7,15 @@
 
 //**********************************************************************
 
-class ExampleGame : public King::Updater {
+class ExampleGame : public King::Updater
+{
+
 public:
 
-	ExampleGame()
-		: mEngine("./assets")
-		, mRotation(0.0f)
-		, mYellowDiamondX(100.0f)
-		, mYellowDiamondY(100.0f) {
+	ExampleGame() : mEngine("./assets") {
+	}
+
+	void RenderBackground() {
 	}
 
 	void Start() {
@@ -26,10 +27,8 @@ public:
 	}
 
 private:
+
 	King::Engine mEngine;
-	float mRotation;
-	float mYellowDiamondX;
-	float mYellowDiamondY;
 };
 
 //**********************************************************************
