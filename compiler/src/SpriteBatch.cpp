@@ -320,7 +320,7 @@ std::shared_ptr<SpriteBatch::Instance> SpriteBatch::addInstance(const Template& 
 			if (mTransforms.size() < mMaxInstances)
 			{
 				mInstances.push_back(std::make_shared<Instance>(template_ref.mTemplateId, mTransforms.size()));
-				mTransforms.push_back(glm::mat4(1.0f));
+				mTransforms.push_back({ glm::mat4(1.0f), glm::vec4(1.0f) });
 				return mInstances.back();
 			}
 		}
@@ -330,10 +330,12 @@ std::shared_ptr<SpriteBatch::Instance> SpriteBatch::addInstance(const Template& 
 	return std::make_shared<Instance>(SpriteBatch::Instance::INVALID);
 }
 
-bool SpriteBatch::updateInstance(const std::shared_ptr<Instance>& instance_ref, glm::vec2 position, glm::vec2 scale, float rotation)
+bool SpriteBatch::updateInstance(const std::shared_ptr<Instance>& instance_ref,
+	glm::vec2 position, glm::vec2 scale, glm::vec4 color, float rotation)
 {
 	Instance* instance_ptr = instance_ref.get();
-	if (instance_ptr->isValid() && mTransforms.size() > instance_ptr->mTransformId)
+	const auto data_id = instance_ptr->mTransformId;
+	if (instance_ptr->isValid() && mTransforms.size() > data_id)
 	{
 		glm::mat4 model;
 
@@ -344,7 +346,9 @@ bool SpriteBatch::updateInstance(const std::shared_ptr<Instance>& instance_ref, 
 		model = glm::translate(model, glm::vec3(-0.5f * scale.x, -0.5f * scale.y, 0.0f));
 		model = glm::scale(model, glm::vec3(scale, 1.0f));
 
-		mTransforms[instance_ptr->mTransformId] = model;
+		mTransforms[data_id].mTransform = model;
+		mTransforms[data_id].mColor = color;
+
 		mPendingInstances.emplace(instance_ptr->mTransformId);
 		return true;
 	}

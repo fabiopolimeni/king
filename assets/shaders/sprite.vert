@@ -40,12 +40,19 @@ layout(binding = UBO_INSTANCE) uniform Instance
 	Sprite Sprites[MAX_INSTANCES];
 } Instances;
 
-layout(binding = UBO_TRANSFORM) uniform Transform
+struct Model
 {
-	mat4 Models[MAX_INSTANCES];
-} Transforms;
+	mat4 Transform;
+	vec4 Color;
+};
+
+layout(binding = UBO_TRANSFORM) uniform Datum
+{
+	Model Models[MAX_INSTANCES];
+} Data;
 
 out vec2 TexCoords;
+out vec4 VertColor;
 
 out gl_PerVertex
 {
@@ -55,9 +62,12 @@ out gl_PerVertex
 void main()
 {
 	Sprite sprite = Instances.Sprites[gl_InstanceID];
-	mat4 model = Transforms.Models[sprite.TransformID];
+	Model model = Data.Models[sprite.TransformID];
 	vec4 vertex = Templates.Vertices[sprite.TemplateID].XYUV[gl_VertexID % MAX_VERTICES];
 	
+	// To fragment shader
+	VertColor = model.Color;
 	TexCoords = vertex.zw;
-	gl_Position = Projection.Ortho * model * vec4(vertex.xy, 0.0, 1.0);
+	
+	gl_Position = Projection.Ortho * model.Transform * vec4(vertex.xy, 0.0, 1.0);
 }

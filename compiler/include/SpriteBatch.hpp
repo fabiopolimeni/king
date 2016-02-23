@@ -91,6 +91,7 @@ public:
 	bool updateInstance(const std::shared_ptr<Instance>& sprite_ref,
 		glm::vec2 position = glm::vec2(0.f),
 		glm::vec2 scale = glm::vec2(1.f),
+		glm::vec4 color = glm::vec4(1.f),
 		float rotation = 0.f);
 
 	// Flush pending uniform buffers
@@ -104,14 +105,17 @@ private:
 	GraphicsPipeline mGraphicsPipe;
 
 	uint32_t	mTexId;
-
 	uint32_t	mVAO;
 	uint32_t	mUBO[eUBO_MAX];
 
 	size_t	mMaxTemplates;
 	size_t	mMaxInstances;
 
-	typedef glm::mat4 Transform;
+	struct Transform
+	{
+		glm::mat4 mTransform;
+		glm::vec4 mColor;
+	};
 
 	std::vector<Template>					mTemplates;
 	std::vector<Transform>					mTransforms;

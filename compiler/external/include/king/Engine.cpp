@@ -121,11 +121,12 @@ namespace King {
 		
 		auto& sprite_batch = mPimpl->mBatches[Engine::IMAGE_BACKGROUND];
 		
-		size_t sprte_size = 64;
-		auto sprite_position = glm::vec2((WindowWidth - sprte_size)*0.5f, (WindowHeight - sprte_size)*0.5);
-		auto sprite_rotation = 45.f;
+		size_t size = 64;
+		auto position = glm::vec2((WindowWidth - size)*0.5f, (WindowHeight - size)*0.5);
+		auto rotation = 45.f;
+		auto color = glm::vec4(0.4f, 0.2f, 0.2f, 1.0f);
 
-		sprite_batch->updateInstance(mPimpl->mCell, sprite_position, glm::vec2(float(sprte_size)), sprite_rotation);
+		sprite_batch->updateInstance(mPimpl->mCell, position, glm::vec2(float(size)), color, rotation);
 		sprite_batch->flushBuffers();
 		sprite_batch->draw();
 	}
