@@ -1,14 +1,21 @@
 #pragma once
 
-#include <gli/gli.hpp>
-
 #include <cstdint>
 #include <memory>
+
+namespace gli
+{
+	class texture;
+}
+
+using Surface = gli::texture;
 
 class SpriteTexture
 {
 
 public:
+
+	~SpriteTexture();
 
 	bool create(const char* filename);
 	void destroy();
@@ -21,8 +28,9 @@ public:
 
 private:
 
-	using Surface = gli::texture;
-
 	uint32_t					mTextureId;
-	std::unique_ptr<Surface>	mTexture;
+
+	// Shared pointer to avoid the pimpl problem with incomplete types
+	std::shared_ptr<Surface>	mTexture;
+
 };

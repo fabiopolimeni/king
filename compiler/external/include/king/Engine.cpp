@@ -134,9 +134,10 @@ namespace King {
 		size_t size = 64;
 		auto rotation = 0.f;
 		auto color = glm::vec4(/*0.4f, 0.2f, 0.2f,*/ 1.0f);
-		auto position = glm::vec2((WindowWidth - size) * 0.5f, (WindowHeight - size) * 0.5f);
+		//auto position = glm::vec2((WindowWidth - size) * 0.5f, (WindowHeight - size) * 0.5f);
+		auto position = glm::vec2(200.0f);
 
-		sprite_batch->updateInstance(mPimpl->mCell, position, glm::vec2(float(size)), color, rotation);
+		//sprite_batch->updateInstance(mPimpl->mCell, position, glm::vec2(float(size)), color, rotation);
 	}
 
 	void Engine::Render(Sprite texture, float x, float y, float rotation) {
@@ -334,15 +335,28 @@ namespace King {
 		const auto& sprite_template = mTemplates[Engine::SPRITE_CELL];
 		mCell = sprite_batch->addInstance(*sprite_template);
 
+		int32_t n_cells = GetGridSize() * GetGridSize();
+		float grid_step = float(GetGridHeight() / GetGridSize());
+		float gird_scale = 0.95f;
+		
+		int32_t row_id = -1;
+		int32_t col_id = 0;
+
 		// Create background cell instances
-		size_t n_cells = GetGridSize() * GetGridSize();
-		size_t grid_step = GetGridHeight() / GetGridSize();
-		for (size_t i = 0; i < n_cells; ++i) {
+		for (int32_t i = 0; i < n_cells; ++i) {
 			const auto& sprite_template = mTemplates[Engine::SPRITE_CELL];
 			mBackground[i] = sprite_batch->addInstance(*sprite_template);
 
-			// TODO Update cell position
-			//sprite_batch->updateInstance(mBackground[i], 
+			// Step up into the the columns
+			col_id = i % GetGridSize();
+			if (col_id == 0) {
+				row_id += 1;
+			}
+
+			// Update cell position
+			glm::vec2 cell_pos(col_id * grid_step, row_id * grid_step);
+			glm::vec2 cell_size(grid_step * gird_scale);
+			sprite_batch->updateInstance(mBackground[i], cell_pos, cell_size);
 		}
 	}
 

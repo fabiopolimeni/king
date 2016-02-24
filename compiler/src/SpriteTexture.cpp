@@ -1,6 +1,8 @@
 #include "SpriteTexture.hpp"
 #include "OGL.hpp"
 
+#include <gli/gli.hpp>
+
 namespace
 {
 	gli::texture* build(char const* Filename, gl::uint32 TextureName)
@@ -145,4 +147,7 @@ int32_t SpriteTexture::getHeight() const
 {
 	glm::tvec3<gl::sizei> const Dimensions(mTexture->dimensions());
 	return Dimensions.y;
+}
+
+SpriteTexture::~SpriteTexture() {
 }

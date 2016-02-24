@@ -6,6 +6,7 @@
 #include <glm/vec4.hpp>
 #include <glm/mat4x4.hpp>
 
+#include <cstdint>
 #include <vector>
 #include <queue>
 #include <memory>
@@ -32,7 +33,7 @@ public:
 	struct Template
 	{
 		const glm::vec4	mVBO[MAX_VERTICES];
-		const size_t	mTemplateId;
+		const uint32_t	mTemplateId;
 		
 		static Template INVALID;
 		static const size_t VBO_SIZE = sizeof(glm::vec4) * MAX_VERTICES;
@@ -41,7 +42,7 @@ public:
 			return mTemplateId != INDEX_NONE;
 		}
 
-		Template(const glm::vec4* vbo, const size_t id)
+		Template(const glm::vec4* vbo, const uint32_t id)
 			: mTemplateId(id)
 		{
 			if (vbo) {
@@ -60,15 +61,16 @@ public:
 			return mTemplateId != INDEX_NONE && mDataId != INDEX_NONE;
 		}
 
-		inline Instance(const size_t template_id, const size_t transform_id)
+		inline Instance(const uint32_t template_id, const uint32_t transform_id)
 			: mTemplateId(template_id), mDataId(transform_id) {
 		}
 
 	private:
 
 		friend class SpriteBatch;
-		const size_t	mTemplateId;
-			  size_t	mDataId;
+		const uint32_t	mTemplateId;
+		uint32_t		mDataId;
+		uint32_t		mPad[2];
 	};
 
 	bool init(glm::mat4 projection, uint32_t texture_id,
