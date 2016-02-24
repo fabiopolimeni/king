@@ -299,6 +299,20 @@ const SpriteBatch::Template& SpriteBatch::createTemplate(glm::vec4 atlas_offsets
 	return SpriteBatch::Template::INVALID;
 }
 
+bool SpriteBatch::swapInstanceTemplate(std::shared_ptr<Instance>& instance, const Template & new_template)
+{
+	if (new_template.isValid() && instance->isValid())
+	{
+		assert(new_template.mTemplateId < mTemplates.size());
+		instance->mTemplateId = new_template.mTemplateId;
+
+		bDirtyInstances = true;
+		return true;
+	}
+
+	return false;
+}
+
 std::shared_ptr<SpriteBatch::Instance> SpriteBatch::addInstance(const Template& template_ref)
 {
 	if (template_ref.isValid())

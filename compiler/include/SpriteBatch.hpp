@@ -61,14 +61,14 @@ public:
 			return mTemplateId != INDEX_NONE && mDataId != INDEX_NONE;
 		}
 
-		inline Instance(const uint32_t template_id, const uint32_t transform_id)
+		inline Instance(uint32_t template_id, uint32_t transform_id)
 			: mTemplateId(template_id), mDataId(transform_id) {
 		}
 
 	private:
 
 		friend class SpriteBatch;
-		const uint32_t	mTemplateId;
+		uint32_t	mTemplateId;
 		uint32_t		mDataId;
 		uint32_t		mPad[2];
 	};
@@ -82,6 +82,9 @@ public:
 	// Generates the VBO containing vertex positions and texture coordinates
 	// @param atlas_offsets defined as x=left, y=top, z=right, w=bottom
 	const Template& createTemplate(glm::vec4 atlas_offsets);
+
+	// Swap instance template with the provided one
+	bool swapInstanceTemplate(std::shared_ptr<Instance>& instance, const Template& new_template);
 
 	// Add an instance of template to the sprite's batch
 	// @return The ref index of the instance, SpriteKey.mTemplate == null otherwise
