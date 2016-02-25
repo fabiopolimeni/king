@@ -38,13 +38,14 @@ namespace King {
 		std::unique_ptr<SpriteTexture> mTextures[Engine::IMAGE_MAX];
 		std::unique_ptr<SpriteBatch> mBatches[Engine::IMAGE_MAX];
 		std::unique_ptr<SpriteBatch::Template> mTemplates[Engine::SPRITE_MAX];
+
 		size_t mTemplateBatchMap[Engine::SPRITE_MAX];
 
 		std::shared_ptr<SpriteBatch::Instance> mBackground[GRID_SIZE * GRID_SIZE];
 		std::shared_ptr<SpriteBatch::Instance> mDiamonds[GRID_SIZE * GRID_SIZE];
 		std::shared_ptr<SpriteBatch::Instance> mText[MAX_GLYPHS];
 
-		std::shared_ptr<SpriteBatch::Instance> mCell;
+		std::vector<std::shared_ptr<SpriteBatch::Instance>> mPendingDiamonds;
 
 		float mElapsedTicks;
 		float mLastFrameSeconds;
@@ -69,7 +70,7 @@ namespace King {
 		{
 		}
 
-		int32_t GetGridSize() const;
+		int32_t GetGridDims() const;
 		int32_t GetGridStartX() const;
 		int32_t GetGridStartY() const;
 		int32_t GetGridWidth() const;
@@ -77,6 +78,10 @@ namespace King {
 
 		float GetCellSize() const;
 		int32_t GetNumOfGridCells() const;
+
+		std::unique_ptr<SpriteBatch>& GetBackgroundBatch();
+		std::unique_ptr<SpriteBatch>& GetDiamondBatch();
+		std::unique_ptr<SpriteBatch>& GetTextBatch();
 
 		size_t GetBatchId(Engine::Sprite sprite_template) const;
 
@@ -137,16 +142,6 @@ namespace King {
 	}
 
 	void Engine::Render(Engine::Sprite texture, const glm::mat4& transform) {
-		
-		auto& sprite_batch = mPimpl->mBatches[Engine::IMAGE_BACKGROUND];
-		
-		size_t size = 64;
-		auto rotation = 0.f;
-		auto color = glm::vec4(/*0.4f, 0.2f, 0.2f,*/ 1.0f);
-		//auto position = glm::vec2((WindowWidth - size) * 0.5f, (WindowHeight - size) * 0.5f);
-		auto position = glm::vec2(200.0f);
-
-		//sprite_batch->updateInstance(mPimpl->mCell, position, glm::vec2(float(size)), color, rotation);
 	}
 
 	void Engine::Render(Sprite texture, float x, float y, float rotation) {
@@ -216,31 +211,71 @@ namespace King {
 		Write(text, transformation);
 	}
 
-	bool Engine::ChangeGridCell(int32_t index, Sprite sprite_t)
+	void Engine::ChangeCell(int32_t index, Sprite new_template)
 	{
-		if (index >= mPimpl->GetNumOfGridCells()) {
-			return false;
-		}
-
+		assert(index < mPimpl->GetNumOfGridCells());
 		auto& instance = mPimpl->mBackground[index];
-		auto& sprite_batch = mPimpl->mBatches[mPimpl->GetBatchId(sprite_t)];
-		const auto& sprite_template = mPimpl->mTemplates[sprite_t];
-		return sprite_batch->swapInstanceTemplate(instance, *sprite_template);
+		auto& grid_batch = mPimpl->GetBackgroundBatch();
+		const auto& sprite_template = mPimpl->mTemplates[new_template];
+		grid_batch->swapInstanceTemplate(instance, *sprite_template);
 	}
 
-	bool Engine::UpdateGridCell(int32_t index, glm::vec2 scale, glm::vec4 color, float rotation)
+	void Engine::UpdateCell(int32_t index, glm::vec2 scale, glm::vec4 color, float rotation)
 	{
-		if (index >= mPimpl->GetNumOfGridCells()) {
-			return false;
-		}
-
+		assert(index < mPimpl->GetNumOfGridCells());
 		auto& instance = mPimpl->mBackground[index];
-		auto& sprite_batch = mPimpl->mBatches[mPimpl->GetBatchId(Engine::SPRITE_CELL)];
-		return sprite_batch->updateInstance(instance, sprite_batch->getInstancePosition(instance),
-			scale, color, rotation);
+		auto& grid_batch = mPimpl->GetBackgroundBatch();
+		grid_batch->updateInstance(instance, grid_batch->getInstancePosition(instance), scale, color, rotation);
 	}
 
-	int32_t Engine::GetGridIndex(int32_t screen_x, int32_t screen_y) const
+	void Engine::UpdateDiamond(int32_t index, glm::vec2 position, glm::vec2 scale, glm::vec4 color, float rotation)
+	{
+		assert(index < mPimpl->GetNumOfGridCells());
+		auto& instance = mPimpl->mBackground[index];
+		auto& diamonds_batch = mPimpl->GetDiamondBatch();
+		diamonds_batch->updateInstance(instance, position, scale, color, rotation);
+	}
+
+	void Engine::ChangeDiamond(int32_t index, Sprite new_template)
+	{
+		assert(index < mPimpl->GetNumOfGridCells());
+		auto& instance = mPimpl->mBackground[index];
+		auto& diamonds_batch = mPimpl->GetDiamondBatch();
+		const auto& sprite_template = mPimpl->mTemplates[new_template];
+		diamonds_batch->swapInstanceTemplate(instance, *sprite_template);
+	}
+
+	void Engine::AddDiamond(int32_t index, Sprite diamond_template)
+	{
+		assert(index < mPimpl->GetNumOfGridCells());
+
+		// Remove any previous diamond sprite instance
+		RemoveDiamond(index);
+
+		auto& instance = mPimpl->mDiamonds[index];
+		auto& diamonds_batch = mPimpl->GetDiamondBatch();
+		mPimpl->mDiamonds[index] = diamonds_batch->addInstance(*mPimpl->mTemplates[diamond_template]);
+		diamonds_batch->swapInstanceTemplate(instance, *mPimpl->mTemplates[diamond_template]);
+		diamonds_batch->updateInstance(instance, GetCellPosition(index), glm::vec2(float(mPimpl->GetCellSize())));
+	}
+
+	void Engine::RemoveDiamond(int32_t index)
+	{
+		if (IsCellFull(index))
+		{
+			auto& diamonds_batch = mPimpl->GetDiamondBatch();
+			diamonds_batch->removeInstance(mPimpl->mDiamonds[index]);
+		}
+	}
+
+	void Engine::AddFloatingDiamond(float x, float y, Sprite diamond_template)
+	{
+		auto& diamonds_batch = mPimpl->GetDiamondBatch();
+		mPimpl->mPendingDiamonds.push_back(diamonds_batch->addInstance(*mPimpl->mTemplates[diamond_template]));
+		diamonds_batch->updateInstance(mPimpl->mPendingDiamonds.back(), glm::vec2(x, y), glm::vec2(float(mPimpl->GetCellSize())));
+	}
+
+	int32_t Engine::GetCellIndex(int32_t screen_x, int32_t screen_y) const
 	{
 		screen_y = GetWindowHeight() - screen_y;
 
@@ -256,12 +291,29 @@ namespace King {
 			int32_t cell_x = grid_x / int32_t(mPimpl->GetCellSize());
 			int32_t cell_y = grid_y / int32_t(mPimpl->GetCellSize());
 
-			if (cell_y < mPimpl->GetGridSize() && cell_x < mPimpl->GetGridSize()) {
-				return cell_y * mPimpl->GetGridSize() + cell_x;
+			if (cell_y < mPimpl->GetGridDims() && cell_x < mPimpl->GetGridDims()) {
+				return cell_y * mPimpl->GetGridDims() + cell_x;
 			}
 		}
 
 		return -1;
+	}
+
+	glm::vec2 Engine::GetCellPosition(int32_t index) const
+	{
+		assert(index < mPimpl->GetNumOfGridCells());
+		int32_t row_id = index / mPimpl->GetGridDims();
+		int32_t col_id = index - row_id;
+
+		return glm::vec2(
+			col_id * mPimpl->GetCellSize() + mPimpl->GetGridStartY(),
+			row_id * mPimpl->GetCellSize() + mPimpl->GetGridStartX());
+	}
+
+	bool Engine::IsCellFull(int32_t index) const
+	{
+		assert(index < mPimpl->GetNumOfGridCells());
+		return mPimpl->mDiamonds[index].get() != nullptr;
 	}
 
 	int32_t Engine::GetWindowWidth() const {
@@ -276,7 +328,7 @@ namespace King {
 	// ENGINE IMPLEMENTATION
 	//////////////////////////////////////////////////////////////////////////
 
-	int32_t Engine::Implementation::GetGridSize() const {
+	int32_t Engine::Implementation::GetGridDims() const {
 		return GRID_SIZE;
 	}
 
@@ -297,11 +349,26 @@ namespace King {
 	}
 
 	float Engine::Implementation::GetCellSize() const {
-		return float(GetGridHeight() / GetGridSize());
+		return float(GetGridHeight() / GetGridDims());
 	}
 
 	int32_t Engine::Implementation::GetNumOfGridCells() const {
-		return GetGridSize() * GetGridSize();
+		return GetGridDims() * GetGridDims();
+	}
+
+	std::unique_ptr<SpriteBatch>& Engine::Implementation::GetBackgroundBatch()
+	{
+		return mBatches[Engine::IMAGE_BACKGROUND];
+	}
+
+	std::unique_ptr<SpriteBatch>& Engine::Implementation::GetDiamondBatch()
+	{
+		return mBatches[Engine::IMAGE_DIAMONDS];
+	}
+
+	std::unique_ptr<SpriteBatch>& Engine::Implementation::GetTextBatch()
+	{
+		return mBatches[Engine::IMAGE_TEXT];
 	}
 
 	size_t Engine::Implementation::GetBatchId(Engine::Sprite sprite_template) const
@@ -347,7 +414,7 @@ namespace King {
 
 	void Engine::Implementation::InitSpriteBatches(const std::string & assets_dir) {
 		std::string texture_files[Engine::IMAGE_MAX] = {
-			assets_dir + "/textures/Cell.dds",
+			assets_dir + "/textures/Cells.dds",
 			assets_dir + "/textures/Diamonds.dds",
 			assets_dir + "/textures/berlin_sans_demi_72_0.dds"
 		};
@@ -375,21 +442,31 @@ namespace King {
 	}
 
 	void Engine::Implementation::InitSpriteTemplates() {
-		// Generate background template
-		mTemplateBatchMap[Engine::SPRITE_CELL] = Engine::IMAGE_BACKGROUND;
-		mTemplates[Engine::SPRITE_CELL].reset(new SpriteBatch::Template(
-			mBatches[Engine::IMAGE_BACKGROUND]->createTemplate(
-				glm::vec4(0.f, 1.f, 1.f, 0.f))));
+
+		// Generate background templates
+		{
+			float x_step = float(mTextures[Engine::IMAGE_BACKGROUND]->getHeight()) /
+				float(mTextures[Engine::IMAGE_BACKGROUND]->getWidth());
+
+			for (size_t i = Engine::SPRITE_CELL_EMPTY; i <= Engine::SPRITE_CELL_FORBIDDEN; ++i) {
+				mTemplateBatchMap[i] = Engine::IMAGE_BACKGROUND;
+				mTemplates[i].reset(new SpriteBatch::Template(
+					mBatches[Engine::IMAGE_BACKGROUND]->createTemplate(
+						glm::vec4(i * x_step, 1.f, (i + 1) * x_step, 0.f))));
+			}
+		}
 
 		// Generate diamond templates
-		float x_step = float(mTextures[Engine::IMAGE_DIAMONDS]->getWidth()) /
-					   float(mTextures[Engine::IMAGE_DIAMONDS]->getHeight());
+		{
+			float x_step = float(mTextures[Engine::IMAGE_DIAMONDS]->getHeight()) /
+				float(mTextures[Engine::IMAGE_DIAMONDS]->getWidth());
 
-		for (size_t i = Engine::SPRITE_BLUE; i <= Engine::SPRITE_WHITE; ++i) {
-			mTemplateBatchMap[i] = Engine::IMAGE_DIAMONDS;
-			mTemplates[i].reset(new SpriteBatch::Template(
-				mBatches[Engine::IMAGE_DIAMONDS]->createTemplate(
-					glm::vec4(i * x_step, 1.f, (i + 1) * x_step, 0.f))));
+			for (size_t i = Engine::SPRITE_BLUE; i <= Engine::SPRITE_WHITE; ++i) {
+				mTemplateBatchMap[i] = Engine::IMAGE_DIAMONDS;
+				mTemplates[i].reset(new SpriteBatch::Template(
+					mBatches[Engine::IMAGE_DIAMONDS]->createTemplate(
+						glm::vec4(i * x_step, 1.f, (i + 1) * x_step, 0.f))));
+			}
 		}
 
 		// TODO: Cache font glyphs
@@ -400,9 +477,7 @@ namespace King {
 
 	void Engine::Implementation::InitSpriteIntances() {
 		// Create an instance for the cell sprite
-		auto& sprite_batch = mBatches[mTemplateBatchMap[Engine::SPRITE_CELL]];
-		const auto& sprite_template = mTemplates[Engine::SPRITE_CELL];
-		mCell = sprite_batch->addInstance(*sprite_template);
+		auto& sprite_batch = mBatches[mTemplateBatchMap[Engine::SPRITE_CELL_EMPTY]];
 
 		int32_t n_cells = GetNumOfGridCells();
 		float grid_step = GetCellSize();
@@ -413,11 +488,11 @@ namespace King {
 
 		// Create background cell instances
 		for (int32_t i = 0; i < n_cells; ++i) {
-			const auto& sprite_template = mTemplates[Engine::SPRITE_CELL];
+			const auto& sprite_template = mTemplates[Engine::SPRITE_CELL_EMPTY];
 			mBackground[i] = sprite_batch->addInstance(*sprite_template);
 
-			// Step up into the the columns
-			col_id = i % GetGridSize();
+			// Step up into the columns
+			col_id = i % GetGridDims();
 			if (col_id == 0) {
 				row_id += 1;
 			}

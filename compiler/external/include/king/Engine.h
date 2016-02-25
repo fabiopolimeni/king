@@ -11,8 +11,17 @@ namespace King {
 	public:
 
 		enum Sprite {
-			SPRITE_CELL,
+			
+			// Background
+			SPRITE_CELL_EMPTY,
+			SPRITE_CELL_FULL,
+			SPRITE_CELL_ALLOWED,
+			SPRITE_CELL_FORBIDDEN,
+
+			// Text
 			SPRITE_CHAR,
+			
+			// Diamonds
 			SPRITE_BLUE,
 			SPRITE_GREEN,
 			SPRITE_PURPLE,
@@ -21,6 +30,7 @@ namespace King {
 			SPRITE_CYAN,
 			SPRITE_BLACK,
 			SPRITE_WHITE,
+			
 			SPRITE_MAX
 		};
 
@@ -48,10 +58,19 @@ namespace King {
 		void Write(const char* text, const glm::mat4& transform);
 		void Write(const char* text, float x, float y, float rotation = 0.0f);
 
-		int32_t GetGridIndex(int32_t screen_x, int32_t screen_y) const;
+		void ChangeCell(int32_t index, Sprite new_template);
+		void UpdateCell(int32_t index, glm::vec2 scale, glm::vec4 color, float rotation);
+		
+		void UpdateDiamond(int32_t index, glm::vec2 position, glm::vec2 scale, glm::vec4 color, float rotation);
+		void ChangeDiamond(int32_t index, Sprite new_template);
+		void AddDiamond(int32_t index, Sprite diamond_template);
+		void RemoveDiamond(int32_t index);
 
-		bool ChangeGridCell(int32_t index, Sprite new_template);
-		bool UpdateGridCell(int32_t index, glm::vec2 scale, glm::vec4 color, float rotation);
+		void AddFloatingDiamond(float x, float y, Sprite diamond_template);
+
+		int32_t GetCellIndex(int32_t screen_x, int32_t screen_y) const;
+		glm::vec2 GetCellPosition(int32_t index) const;
+		bool IsCellFull(int32_t index) const;
 
 		int32_t GetWindowWidth() const;
 		int32_t GetWindowHeight() const;
