@@ -2,9 +2,10 @@
 
 #include "GraphicsPipeline.hpp"
 
-#include <glm/vec2.hpp>
 #include <glm/vec4.hpp>
+#include <glm/vec2.hpp>
 #include <glm/mat4x4.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 #include <cstdint>
 #include <vector>
@@ -105,6 +106,12 @@ public:
 
 	// Draw all instances in once
 	void draw() const;
+
+	// Get instance info
+	glm::vec2 getInstancePosition(const std::shared_ptr<Instance>& instance) const;
+	glm::vec2 getInstanceScale(const std::shared_ptr<Instance>& instance) const;
+	float getInstanceRotation(const std::shared_ptr<Instance>& instance) const;
+	glm::vec4 getInstanceColor(const std::shared_ptr<Instance>& instance) const;
 
 private:
 

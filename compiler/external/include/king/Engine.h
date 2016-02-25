@@ -49,10 +49,12 @@ namespace King {
 		void Write(const char* text, float x, float y, float rotation = 0.0f);
 
 		int32_t GetGridIndex(int32_t screen_x, int32_t screen_y) const;
-		bool UpdateGrid(size_t x, size_t y,	glm::vec2 scale, glm::vec4 color, float rotation);
 
-		int GetWindowWidth() const;
-		int GetWindowHeight() const;
+		bool ChangeGridCell(int32_t index, Sprite new_template);
+		bool UpdateGridCell(int32_t index, glm::vec2 scale, glm::vec4 color, float rotation);
+
+		int32_t GetWindowWidth() const;
+		int32_t GetWindowHeight() const;
 
 	private:
 

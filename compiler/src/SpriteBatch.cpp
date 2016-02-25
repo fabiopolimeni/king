@@ -4,7 +4,9 @@
 #include "format.hpp"
 
 #include <glm/vec3.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/matrix_decompose.hpp>
 
 #include <cassert>
 #include <cmath>
@@ -267,6 +269,58 @@ SpriteBatch::Instance SpriteBatch::Instance::INVALID = {
 	INDEX_NONE, INDEX_NONE
 };
 
+
+glm::vec2 SpriteBatch::getInstancePosition(const std::shared_ptr<Instance>& instance) const
+{
+	assert(instance->isValid());
+	glm::mat4 transformation = mData[instance->mDataId].mTransform;
+
+	glm::vec3 scale;
+	glm::quat rotation;
+	glm::vec3 translation;
+	glm::vec3 skew;
+	glm::vec4 perspective;
+	glm::decompose(transformation, scale, rotation, translation, skew, perspective);
+
+	return glm::vec2(translation);
+}
+
+glm::vec2 SpriteBatch::getInstanceScale(const std::shared_ptr<Instance>& instance) const
+{
+	assert(instance->isValid());
+	glm::mat4 transformation = mData[instance->mDataId].mTransform;
+
+	glm::vec3 scale;
+	glm::quat rotation;
+	glm::vec3 translation;
+	glm::vec3 skew;
+	glm::vec4 perspective;
+	glm::decompose(transformation, scale, rotation, translation, skew, perspective);
+
+	return glm::vec2(scale);
+}
+
+float SpriteBatch::getInstanceRotation(const std::shared_ptr<Instance>& instance) const
+{
+	assert(instance->isValid());
+	glm::mat4 transformation = mData[instance->mDataId].mTransform;
+
+	glm::vec3 scale;
+	glm::quat rotation;
+	glm::vec3 translation;
+	glm::vec3 skew;
+	glm::vec4 perspective;
+	glm::decompose(transformation, scale, rotation, translation, skew, perspective);
+
+	return glm::angle(rotation);
+}
+
+glm::vec4 SpriteBatch::getInstanceColor(const std::shared_ptr<Instance>& instance) const
+{
+	assert(instance->isValid());
+	return mData[instance->mDataId].mColor;
+}
+
 const SpriteBatch::Template& SpriteBatch::createTemplate(glm::vec4 atlas_offsets)
 {
 	float left = atlas_offsets.x;
@@ -330,7 +384,7 @@ std::shared_ptr<SpriteBatch::Instance> SpriteBatch::addInstance(const Template& 
 			if (mData.size() < mMaxInstances)
 			{
 				mInstances.push_back(std::make_shared<Instance>(template_ref.mTemplateId, mData.size()));
-				mData.push_back({ glm::mat4(1.0f), glm::vec4(1.0f) });
+				mData.push_back({ glm::mat4(0.0f), glm::vec4(1.0f) });
 
 				bDirtyInstances = true;
 				return mInstances.back();

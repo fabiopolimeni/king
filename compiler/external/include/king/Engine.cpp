@@ -78,6 +78,8 @@ namespace King {
 		float GetCellSize() const;
 		int32_t GetNumOfGridCells() const;
 
+		size_t GetBatchId(Engine::Sprite sprite_template) const;
+
 		void Start();
 		void ParseEvents();
 
@@ -85,6 +87,10 @@ namespace King {
 		void InitSpriteTemplates();
 		void InitSpriteIntances();
 	};
+
+	//////////////////////////////////////////////////////////////////////////
+	// ENGINE
+	//////////////////////////////////////////////////////////////////////////
 
 	Engine::Engine(const char* assets_directory)
 		: mPimpl(new Implementation) {
@@ -210,18 +216,65 @@ namespace King {
 		Write(text, transformation);
 	}
 
-	bool Engine::UpdateGrid(size_t x, size_t y, glm::vec2 scale, glm::vec4 color, float rotation)
+	bool Engine::ChangeGridCell(int32_t index, Sprite sprite_t)
 	{
-		return false;
+		if (index >= mPimpl->GetNumOfGridCells()) {
+			return false;
+		}
+
+		auto& instance = mPimpl->mBackground[index];
+		auto& sprite_batch = mPimpl->mBatches[mPimpl->GetBatchId(sprite_t)];
+		const auto& sprite_template = mPimpl->mTemplates[sprite_t];
+		return sprite_batch->swapInstanceTemplate(instance, *sprite_template);
 	}
 
-	int Engine::GetWindowWidth() const {
+	bool Engine::UpdateGridCell(int32_t index, glm::vec2 scale, glm::vec4 color, float rotation)
+	{
+		if (index >= mPimpl->GetNumOfGridCells()) {
+			return false;
+		}
+
+		auto& instance = mPimpl->mBackground[index];
+		auto& sprite_batch = mPimpl->mBatches[mPimpl->GetBatchId(Engine::SPRITE_CELL)];
+		return sprite_batch->updateInstance(instance, sprite_batch->getInstancePosition(instance),
+			scale, color, rotation);
+	}
+
+	int32_t Engine::GetGridIndex(int32_t screen_x, int32_t screen_y) const
+	{
+		screen_y = GetWindowHeight() - screen_y;
+
+		const int32_t end_x = mPimpl->GetGridStartX() + mPimpl->GetGridWidth();
+		const int32_t end_y = mPimpl->GetGridStartY() + mPimpl->GetGridHeight();
+
+		if (screen_x >= mPimpl->GetGridStartX() && screen_x < end_x
+			&& screen_y >= mPimpl->GetGridStartY() && screen_y < end_y) {
+
+			int32_t grid_x = screen_x - mPimpl->GetGridStartX();
+			int32_t grid_y = screen_y - mPimpl->GetGridStartY();
+
+			int32_t cell_x = grid_x / int32_t(mPimpl->GetCellSize());
+			int32_t cell_y = grid_y / int32_t(mPimpl->GetCellSize());
+
+			if (cell_y < mPimpl->GetGridSize() && cell_x < mPimpl->GetGridSize()) {
+				return cell_y * mPimpl->GetGridSize() + cell_x;
+			}
+		}
+
+		return -1;
+	}
+
+	int32_t Engine::GetWindowWidth() const {
 		return WindowWidth;
 	}
 
-	int Engine::GetWindowHeight() const {
+	int32_t Engine::GetWindowHeight() const {
 		return WindowHeight;
 	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// ENGINE IMPLEMENTATION
+	//////////////////////////////////////////////////////////////////////////
 
 	int32_t Engine::Implementation::GetGridSize() const {
 		return GRID_SIZE;
@@ -251,28 +304,9 @@ namespace King {
 		return GetGridSize() * GetGridSize();
 	}
 
-	int32_t Engine::GetGridIndex(int32_t screen_x, int32_t screen_y) const
+	size_t Engine::Implementation::GetBatchId(Engine::Sprite sprite_template) const
 	{
-		screen_y = GetWindowHeight() - screen_y;
-
-		const int32_t end_x = mPimpl->GetGridStartX() + mPimpl->GetGridWidth();
-		const int32_t end_y = mPimpl->GetGridStartY() + mPimpl->GetGridHeight();
-
-		if (screen_x >= mPimpl->GetGridStartX() && screen_x < end_x
-			&& screen_y >= mPimpl->GetGridStartY() && screen_y < end_y) {
-
-			int32_t grid_x = screen_x - mPimpl->GetGridStartX();
-			int32_t grid_y = screen_y - mPimpl->GetGridStartY();
-
-			int32_t cell_x = grid_x / int32_t(mPimpl->GetCellSize());
-			int32_t cell_y = grid_y / int32_t(mPimpl->GetCellSize());
-
-			if (cell_y < mPimpl->GetGridSize() && cell_x < mPimpl->GetGridSize()) {
-				return cell_y * mPimpl->GetGridSize() + cell_x;
-			}
-		}
-
-		return -1;
+		return mTemplateBatchMap[sprite_template];
 	}
 
 	void Engine::Implementation::Start() {
@@ -399,6 +433,12 @@ namespace King {
 		SDL_Event event;
 		while (SDL_PollEvent(&event)) {
 			switch (event.type) {
+			case SDL_KEYDOWN: {
+				if (event.key.keysym.sym == SDLK_ESCAPE) {
+					mQuit = true;
+				}
+				break;
+			}
 			case SDL_QUIT:
 				mQuit = true;
 				break;
