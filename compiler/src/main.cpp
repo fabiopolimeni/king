@@ -23,7 +23,14 @@ public:
 	}
 
 	void Update() {
-		mEngine.Render(King::Engine::SPRITE_GREEN, 650.0f, 100.0f);
+
+		if (mEngine.IsMouseButtonDown())
+		{
+			fprintf(stderr, "Background cell: %d (%2.f, %2.f)\n",
+				mEngine.GetGridIndex(mEngine.GetMouseX(), mEngine.GetMouseY()),
+				mEngine.GetMouseX(), mEngine.GetMouseY());
+		}
+
 	}
 
 private:

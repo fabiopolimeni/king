@@ -37,7 +37,7 @@ namespace King {
 		float GetLastFrameSeconds() const;
 		float GetMouseX() const;
 		float GetMouseY() const;
-		bool GetMouseButtonDown() const;
+		bool IsMouseButtonDown() const;
 		
 		void Start(Updater& updater);
 		void Quit();
@@ -48,6 +48,7 @@ namespace King {
 		void Write(const char* text, const glm::mat4& transform);
 		void Write(const char* text, float x, float y, float rotation = 0.0f);
 
+		int32_t GetGridIndex(int32_t screen_x, int32_t screen_y) const;
 		bool UpdateGrid(size_t x, size_t y,	glm::vec2 scale, glm::vec4 color, float rotation);
 
 		int GetWindowWidth() const;

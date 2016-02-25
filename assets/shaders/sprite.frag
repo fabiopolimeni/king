@@ -10,4 +10,4 @@ uniform sampler2D Image;
 void main()
 {    
     FragColor = texture(Image, TexCoords) *  VertColor;
-} 
+}

@@ -69,11 +69,14 @@ namespace King {
 		{
 		}
 
-		size_t GetGridSize() const;
-		size_t GetGridStartX() const;
-		size_t GetGridStartY() const;
-		size_t GetGridWidth() const;
-		size_t GetGridHeight() const;
+		int32_t GetGridSize() const;
+		int32_t GetGridStartX() const;
+		int32_t GetGridStartY() const;
+		int32_t GetGridWidth() const;
+		int32_t GetGridHeight() const;
+
+		float GetCellSize() const;
+		int32_t GetNumOfGridCells() const;
 
 		void Start();
 		void ParseEvents();
@@ -113,7 +116,7 @@ namespace King {
 		return mPimpl->mMouseY;
 	}
 
-	bool Engine::GetMouseButtonDown() const {
+	bool Engine::IsMouseButtonDown() const {
 		return mPimpl->mMouseButtonDown;
 	}
 	
@@ -220,24 +223,56 @@ namespace King {
 		return WindowHeight;
 	}
 
-	size_t Engine::Implementation::GetGridSize() const {
+	int32_t Engine::Implementation::GetGridSize() const {
 		return GRID_SIZE;
 	}
 
-	size_t Engine::Implementation::GetGridStartX() const {
+	int32_t Engine::Implementation::GetGridStartX() const {
 		return 10;
 	}
 
-	size_t Engine::Implementation::GetGridStartY() const {
-		return 10;
+	int32_t Engine::Implementation::GetGridStartY() const {
+		return 30;
 	}
 
-	size_t Engine::Implementation::GetGridWidth() const {
-		return WindowHeight - GetGridStartX();
+	int32_t Engine::Implementation::GetGridWidth() const {
+		return GetGridHeight();
 	}
 
-	size_t Engine::Implementation::GetGridHeight() const {
-		return WindowHeight - GetGridStartY();
+	int32_t Engine::Implementation::GetGridHeight() const {
+		return WindowHeight - GetGridStartY() * 2;
+	}
+
+	float Engine::Implementation::GetCellSize() const {
+		return float(GetGridHeight() / GetGridSize());
+	}
+
+	int32_t Engine::Implementation::GetNumOfGridCells() const {
+		return GetGridSize() * GetGridSize();
+	}
+
+	int32_t Engine::GetGridIndex(int32_t screen_x, int32_t screen_y) const
+	{
+		screen_y = GetWindowHeight() - screen_y;
+
+		const int32_t end_x = mPimpl->GetGridStartX() + mPimpl->GetGridWidth();
+		const int32_t end_y = mPimpl->GetGridStartY() + mPimpl->GetGridHeight();
+
+		if (screen_x >= mPimpl->GetGridStartX() && screen_x < end_x
+			&& screen_y >= mPimpl->GetGridStartY() && screen_y < end_y) {
+
+			int32_t grid_x = screen_x - mPimpl->GetGridStartX();
+			int32_t grid_y = screen_y - mPimpl->GetGridStartY();
+
+			int32_t cell_x = grid_x / int32_t(mPimpl->GetCellSize());
+			int32_t cell_y = grid_y / int32_t(mPimpl->GetCellSize());
+
+			if (cell_y < mPimpl->GetGridSize() && cell_x < mPimpl->GetGridSize()) {
+				return cell_y * mPimpl->GetGridSize() + cell_x;
+			}
+		}
+
+		return -1;
 	}
 
 	void Engine::Implementation::Start() {
@@ -335,9 +370,9 @@ namespace King {
 		const auto& sprite_template = mTemplates[Engine::SPRITE_CELL];
 		mCell = sprite_batch->addInstance(*sprite_template);
 
-		int32_t n_cells = GetGridSize() * GetGridSize();
-		float grid_step = float(GetGridHeight() / GetGridSize());
-		float gird_scale = 0.95f;
+		int32_t n_cells = GetNumOfGridCells();
+		float grid_step = GetCellSize();
+		float gird_scale = 0.98f;
 		
 		int32_t row_id = -1;
 		int32_t col_id = 0;
@@ -354,7 +389,7 @@ namespace King {
 			}
 
 			// Update cell position
-			glm::vec2 cell_pos(col_id * grid_step, row_id * grid_step);
+			glm::vec2 cell_pos(col_id * grid_step + GetGridStartX(), row_id * grid_step + GetGridStartY());
 			glm::vec2 cell_size(grid_step * gird_scale);
 			sprite_batch->updateInstance(mBackground[i], cell_pos, cell_size);
 		}
@@ -365,7 +400,6 @@ namespace King {
 		while (SDL_PollEvent(&event)) {
 			switch (event.type) {
 			case SDL_QUIT:
-			case SDL_KEYDOWN:
 				mQuit = true;
 				break;
 			case SDL_MOUSEBUTTONDOWN:
