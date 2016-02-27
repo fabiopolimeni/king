@@ -43,7 +43,10 @@ namespace King {
 		std::array<TemplateSet, Engine::IMAGE_MAX> mTemplates;
 
 		std::shared_ptr<SpriteBatch::Instance> mBackground[GRID_SIZE * GRID_SIZE];
+		
 		std::shared_ptr<SpriteBatch::Instance> mDiamonds[GRID_SIZE * GRID_SIZE];
+		Engine::Diamond mDiamondsTemplateMap[GRID_SIZE * GRID_SIZE];
+
 		std::shared_ptr<SpriteBatch::Instance> mText[MAX_GLYPHS];
 
 		std::vector<std::shared_ptr<SpriteBatch::Instance>> mPendingDiamonds;
@@ -224,7 +227,7 @@ namespace King {
 	void Engine::UpdateDiamond(int32_t index, glm::vec2 position, glm::vec2 size, glm::vec4 color, float rotation)
 	{
 		assert(index < mPimpl->GetNumOfGridCells());
-		auto& instance = mPimpl->mBackground[index];
+		auto& instance = mPimpl->mDiamonds[index];
 		auto& diamonds_batch = mPimpl->GetDiamondBatch();
 		diamonds_batch->updateInstance(instance, position, size, color, rotation);
 	}
@@ -233,7 +236,7 @@ namespace King {
 	{
 		assert(index < mPimpl->GetNumOfGridCells());
 		auto& diamonds_batch = mPimpl->GetDiamondBatch();
-		auto& instance = mPimpl->mBackground[index];
+		auto& instance = mPimpl->mDiamonds[index];
 
 		// Moving is relative to current instance state.
 		glm::vec2 position = diamonds_batch->getInstancePosition(instance) + translate;
@@ -247,10 +250,11 @@ namespace King {
 	void Engine::ChangeDiamond(int32_t index, Diamond new_template)
 	{
 		assert(index < mPimpl->GetNumOfGridCells());
-		auto& instance = mPimpl->mBackground[index];
+		auto& instance = mPimpl->mDiamonds[index];
 		auto& diamonds_batch = mPimpl->GetDiamondBatch();
 		const auto& sprite_template = mPimpl->GetDiamondTemplates()[new_template];
 		diamonds_batch->swapInstanceTemplate(instance, *sprite_template);
+		mPimpl->mDiamondsTemplateMap[index] = new_template;
 	}
 
 	void Engine::AddDiamond(int32_t index, Diamond diamond_template)
@@ -264,6 +268,7 @@ namespace King {
 		auto& diamonds_batch = mPimpl->GetDiamondBatch();
 		mPimpl->mDiamonds[index] = diamonds_batch->addInstance(*mPimpl->GetDiamondTemplates()[diamond_template]);
 		diamonds_batch->updateInstance(instance, GetCellPosition(index), glm::vec2(mPimpl->GetCellSize()));
+		mPimpl->mDiamondsTemplateMap[index] = diamond_template;
 	}
 
 	void Engine::RemoveDiamond(int32_t index)
@@ -325,6 +330,41 @@ namespace King {
 	{
 		assert(index < mPimpl->GetNumOfGridCells());
 		return mPimpl->mDiamonds[index].get() != nullptr;
+	}
+
+	int32_t Engine::GetGridIndex(int32_t grid_x, int32_t gird_y) const
+	{
+		return gird_y * mPimpl->GetGridDims() + grid_x;
+	}
+
+	int32_t Engine::GetGriRow(int32_t index) const
+	{
+		assert(index < mPimpl->GetNumOfGridCells());
+		return index / mPimpl->GetGridDims();
+	}
+
+	int32_t Engine::GetGridColumn(int32_t index) const
+	{
+		assert(index < mPimpl->GetNumOfGridCells());
+		return index - (GetGriRow(index) * mPimpl->GetGridDims());
+	}
+
+	Engine::Diamond Engine::GetDiamond(int32_t grid_x, int32_t gird_y) const
+	{
+		auto grid_index = GetGridIndex(grid_x, gird_y);
+		return IsCellFull(grid_index)
+			? mPimpl->mDiamondsTemplateMap[grid_index]
+			: Diamond::DIAMOND_MAX;
+	}
+
+	int32_t Engine::GetGridWidth() const
+	{
+		return mPimpl->GetGridDims();
+	}
+
+	int32_t Engine::GetGridHeight() const
+	{
+		return mPimpl->GetGridDims();
 	}
 
 	int32_t Engine::GetWindowWidth() const {
@@ -395,7 +435,13 @@ namespace King {
 	}
 
 	void Engine::Implementation::Start() {
-		while (!mQuit) {
+		
+		if (!mUpdater->Init()) {
+			return;
+		}
+
+		while (!mQuit)
+		{
 			SDL_GL_SwapWindow(mSdlWindow);
 
 			static float depth_value = 1.0f;
@@ -518,6 +564,11 @@ namespace King {
 			glm::vec2 cell_pos(col_id * grid_step + GetGridStartX(), row_id * grid_step + GetGridStartY());
 			glm::vec2 cell_size(grid_step * gird_scale);
 			sprite_batch->updateInstance(mBackground[i], cell_pos, cell_size);
+		}
+
+		// Initialise diamond templates mapping
+		for (auto i = 0; i < GetNumOfGridCells(); ++i) {
+			mDiamondsTemplateMap[i] = Engine::DIAMOND_MAX;
 		}
 	}
 

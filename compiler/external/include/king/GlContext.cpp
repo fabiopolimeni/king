@@ -8,7 +8,7 @@
 #include <glew/glew.h>
 #include <glew/wglew.h>
 
-#define DEBUG_DRIVER_VERBOSE
+//#define DEBUG_DRIVER_VERBOSE
 void CALLBACK DebugCallback(GLenum source, GLenum type, GLuint id,
 	GLenum severity, GLsizei length, const GLchar* message, GLvoid* userParam)
 {

@@ -4,11 +4,64 @@
 #include <king/Updater.h>
 
 #include <exception>
+#include <random>
+#include <algorithm>
 
 //**********************************************************************
 
 class ExampleGame : public King::Updater
 {
+
+	bool bIsAnimating;
+
+private:
+
+	void InitGrid(int32_t max_rows) {
+
+		std::random_device rd;
+		
+		std::mt19937 row_gen(rd());
+		std::uniform_int_distribution<> row_dis(0, std::min(max_rows, mEngine.GetGridHeight()));
+
+		std::mt19937 diamond_gen(rd());
+		std::uniform_int_distribution<> diamond_dis(0, King::Engine::DIAMOND_YELLOW);
+
+		// Fill first max rows, per column
+		for (int32_t c = 0; c < mEngine.GetGridHeight(); ++c) {
+
+			int32_t rows = row_dis(row_gen);
+			for (int32_t r = 0; r < rows; ++r) {
+
+				auto grid_index = mEngine.GetGridIndex(c, r);
+				King::Engine::Diamond diamond = static_cast<King::Engine::Diamond>(diamond_dis(diamond_gen));
+
+				mEngine.AddDiamond(grid_index, diamond);
+			}
+		}
+
+	}
+
+	bool ResolveGrid() {
+
+		// Iterate through the grid and resolve adjacencies
+		for (int32_t c = 0; c < mEngine.GetGridHeight(); ++c) {
+			for (int32_t r = 0; r < mEngine.GetGridHeight(); ++r) {
+
+
+			}
+		}
+
+		return false;
+	}
+
+	bool IsGridAnimating() const {
+		return false;
+	}
+
+	void AnimateGrid() {
+
+
+	}
 
 public:
 
@@ -22,19 +75,15 @@ public:
 		mEngine.Start(*this);
 	}
 
+	bool Init() {
+		InitGrid(4);
+		return true;
+	}
+
 	void Update() {
-
-		if (mEngine.IsMouseButtonDown())
-		{
-			auto cell_index = mEngine.GetCellIndex(float(mEngine.GetMouseX()), float(mEngine.GetMouseY()));
-			if (cell_index >= 0)
-			{
-				mEngine.ChangeCell(cell_index, King::Engine::CELL_FULL);
-				mEngine.AddDiamond(cell_index, King::Engine::DIAMOND_RED);
-			}
-
-			fprintf(stderr, "Background cell: %d (%2.f, %2.f)\n",
-				cell_index,	mEngine.GetMouseX(), mEngine.GetMouseY());
+		
+		if (!IsGridAnimating()) {
+			ResolveGrid();
 		}
 	}
 

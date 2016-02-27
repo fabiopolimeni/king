@@ -78,6 +78,15 @@ namespace King {
 		glm::vec2 GetCellPosition(int32_t index) const;
 		bool IsCellFull(int32_t index) const;
 
+		int32_t GetGridIndex(int32_t grid_x, int32_t gird_y) const;
+		int32_t GetGriRow(int32_t index) const;
+		int32_t GetGridColumn(int32_t index) const;
+
+		Diamond GetDiamond(int32_t grid_x, int32_t gird_y) const;
+
+		int32_t GetGridWidth() const;
+		int32_t GetGridHeight() const;
+
 		int32_t GetWindowWidth() const;
 		int32_t GetWindowHeight() const;
 

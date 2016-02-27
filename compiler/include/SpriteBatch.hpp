@@ -113,6 +113,9 @@ public:
 	float getInstanceRotation(const std::shared_ptr<Instance>& instance) const;
 	glm::vec4 getInstanceColor(const std::shared_ptr<Instance>& instance) const;
 
+	// Returns the instance template
+	const Template& getInstanceTemplate(const std::shared_ptr<Instance>& instance) const;
+
 private:
 
 	GraphicsPipeline mGraphicsPipe;

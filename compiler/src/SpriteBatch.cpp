@@ -321,6 +321,12 @@ glm::vec4 SpriteBatch::getInstanceColor(const std::shared_ptr<Instance>& instanc
 	return mData[instance->mDataId].mColor;
 }
 
+const SpriteBatch::Template& SpriteBatch::getInstanceTemplate(const std::shared_ptr<Instance>& instance) const
+{
+	assert(instance->isValid());
+	return mTemplates[instance->mTemplateId];
+}
+
 const SpriteBatch::Template& SpriteBatch::createTemplate(glm::vec4 atlas_offsets)
 {
 	float left = atlas_offsets.x;
