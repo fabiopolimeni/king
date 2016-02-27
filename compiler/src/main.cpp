@@ -29,8 +29,8 @@ public:
 			auto cell_index = mEngine.GetCellIndex(float(mEngine.GetMouseX()), float(mEngine.GetMouseY()));
 			if (cell_index >= 0)
 			{
-				mEngine.ChangeCell(cell_index, King::Engine::SPRITE_CELL_FULL);
-				mEngine.AddDiamond(cell_index, King::Engine::SPRITE_RED);
+				mEngine.ChangeCell(cell_index, King::Engine::CELL_FULL);
+				mEngine.AddDiamond(cell_index, King::Engine::DIAMOND_RED);
 			}
 
 			fprintf(stderr, "Background cell: %d (%2.f, %2.f)\n",

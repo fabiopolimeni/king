@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include <algorithm>
 #include <vector>
+#include <array>
 
 #define GLM_FORCE_RADIANS 
 #include <glm/gtc/matrix_transform.hpp>
@@ -37,9 +38,9 @@ namespace King {
 
 		std::unique_ptr<SpriteTexture> mTextures[Engine::IMAGE_MAX];
 		std::unique_ptr<SpriteBatch> mBatches[Engine::IMAGE_MAX];
-		std::unique_ptr<SpriteBatch::Template> mTemplates[Engine::SPRITE_MAX];
 
-		size_t mTemplateBatchMap[Engine::SPRITE_MAX];
+		typedef std::vector<std::unique_ptr<SpriteBatch::Template>> TemplateSet;
+		std::array<TemplateSet, Engine::IMAGE_MAX> mTemplates;
 
 		std::shared_ptr<SpriteBatch::Instance> mBackground[GRID_SIZE * GRID_SIZE];
 		std::shared_ptr<SpriteBatch::Instance> mDiamonds[GRID_SIZE * GRID_SIZE];
@@ -82,6 +83,10 @@ namespace King {
 		std::unique_ptr<SpriteBatch>& GetBackgroundBatch();
 		std::unique_ptr<SpriteBatch>& GetDiamondBatch();
 		std::unique_ptr<SpriteBatch>& GetTextBatch();
+
+		TemplateSet& GetBackgroundTemplates();
+		TemplateSet& GetDiamondTemplates();
+		TemplateSet& GetTextTemplates();
 
 		void Start();
 		void ParseEvents();
@@ -137,17 +142,6 @@ namespace King {
 		mPimpl->mUpdater = &updater;
 		mPimpl->mSdlWindow.Show();
 		mPimpl->Start();
-	}
-
-	void Engine::Render(Engine::Sprite texture, const glm::mat4& transform) {
-	}
-
-	void Engine::Render(Sprite texture, float x, float y, float rotation) {
-		glm::mat4 transformation;
-		transformation = glm::translate(transformation, glm::vec3(x, y, 0.0f));
-		transformation = glm::rotate(transformation, rotation, glm::vec3(0.0f, 0.0f, 1.0f));
-
-		Render(texture, transformation);
 	}
 
 	Glyph& FindGlyph(char c) {
@@ -210,12 +204,12 @@ namespace King {
 		Write(text, transformation);
 	}
 
-	void Engine::ChangeCell(int32_t index, Sprite new_template)
+	void Engine::ChangeCell(int32_t index, Background new_template)
 	{
 		assert(index < mPimpl->GetNumOfGridCells());
 		auto& instance = mPimpl->mBackground[index];
 		auto& grid_batch = mPimpl->GetBackgroundBatch();
-		const auto& sprite_template = mPimpl->mTemplates[new_template];
+		const auto& sprite_template = mPimpl->GetBackgroundTemplates()[new_template];
 		grid_batch->swapInstanceTemplate(instance, *sprite_template);
 	}
 
@@ -250,16 +244,16 @@ namespace King {
 		diamonds_batch->updateInstance(instance, position, size, color, rotation);
 	}
 
-	void Engine::ChangeDiamond(int32_t index, Sprite new_template)
+	void Engine::ChangeDiamond(int32_t index, Diamond new_template)
 	{
 		assert(index < mPimpl->GetNumOfGridCells());
 		auto& instance = mPimpl->mBackground[index];
 		auto& diamonds_batch = mPimpl->GetDiamondBatch();
-		const auto& sprite_template = mPimpl->mTemplates[new_template];
+		const auto& sprite_template = mPimpl->GetDiamondTemplates()[new_template];
 		diamonds_batch->swapInstanceTemplate(instance, *sprite_template);
 	}
 
-	void Engine::AddDiamond(int32_t index, Sprite diamond_template)
+	void Engine::AddDiamond(int32_t index, Diamond diamond_template)
 	{
 		assert(index < mPimpl->GetNumOfGridCells());
 
@@ -268,7 +262,7 @@ namespace King {
 
 		auto& instance = mPimpl->mDiamonds[index];
 		auto& diamonds_batch = mPimpl->GetDiamondBatch();
-		mPimpl->mDiamonds[index] = diamonds_batch->addInstance(*mPimpl->mTemplates[diamond_template]);
+		mPimpl->mDiamonds[index] = diamonds_batch->addInstance(*mPimpl->GetDiamondTemplates()[diamond_template]);
 		diamonds_batch->updateInstance(instance, GetCellPosition(index), glm::vec2(mPimpl->GetCellSize()));
 	}
 
@@ -281,10 +275,13 @@ namespace King {
 		}
 	}
 
-	void Engine::AddFloatingDiamond(float x, float y, Sprite diamond_template)
+	void Engine::AddFloatingDiamond(float x, float y, Diamond diamond_template)
 	{
 		auto& diamonds_batch = mPimpl->GetDiamondBatch();
-		mPimpl->mPendingDiamonds.push_back(diamonds_batch->addInstance(*mPimpl->mTemplates[diamond_template]));
+		
+		mPimpl->mPendingDiamonds.push_back(
+			diamonds_batch->addInstance(*mPimpl->GetDiamondTemplates()[diamond_template]));
+		
 		diamonds_batch->updateInstance(mPimpl->mPendingDiamonds.back(),
 			glm::vec2(x, y), glm::vec2(float(mPimpl->GetCellSize())));
 	}
@@ -385,6 +382,18 @@ namespace King {
 		return mBatches[Engine::IMAGE_TEXT];
 	}
 
+	Engine::Implementation::TemplateSet& Engine::Implementation::GetBackgroundTemplates() {
+		return mTemplates[Engine::IMAGE_BACKGROUND];
+	}
+
+	Engine::Implementation::TemplateSet& Engine::Implementation::GetDiamondTemplates() {
+		return mTemplates[Engine::IMAGE_DIAMONDS];
+	}
+
+	Engine::Implementation::TemplateSet& Engine::Implementation::GetTextTemplates() {
+		return mTemplates[Engine::IMAGE_TEXT];
+	}
+
 	void Engine::Implementation::Start() {
 		while (!mQuit) {
 			SDL_GL_SwapWindow(mSdlWindow);
@@ -460,12 +469,10 @@ namespace King {
 			float x_step = float(mTextures[Engine::IMAGE_BACKGROUND]->getHeight()) /
 				float(mTextures[Engine::IMAGE_BACKGROUND]->getWidth());
 
-			for (size_t c_it = Engine::SPRITE_CELL_EMPTY; c_it <= Engine::SPRITE_CELL_FORBIDDEN; ++c_it) {
-				mTemplateBatchMap[c_it] = Engine::IMAGE_BACKGROUND;
-				const float t_it = float(c_it - Engine::SPRITE_CELL_EMPTY);
-				mTemplates[c_it].reset(new SpriteBatch::Template(
+			for (size_t c_it = 0; c_it < Engine::CELL_MAX; ++c_it) {
+				GetBackgroundTemplates().push_back(std::make_unique<SpriteBatch::Template>(
 					mBatches[Engine::IMAGE_BACKGROUND]->createTemplate(
-						glm::vec4(t_it * x_step, 1.f, (t_it + 1) * x_step, 0.f))));
+						glm::vec4(c_it * x_step, 1.f, (c_it + 1) * x_step, 0.f))));
 			}
 		}
 
@@ -474,24 +481,19 @@ namespace King {
 			float x_step = float(mTextures[Engine::IMAGE_DIAMONDS]->getHeight()) /
 				float(mTextures[Engine::IMAGE_DIAMONDS]->getWidth());
 
-			for (size_t d_it = Engine::SPRITE_BLUE; d_it <= Engine::SPRITE_WHITE; ++d_it) {
-				mTemplateBatchMap[d_it] = Engine::IMAGE_DIAMONDS;
-				const float t_it = float(d_it - Engine::SPRITE_BLUE);
-				mTemplates[d_it].reset(new SpriteBatch::Template(
+			for (size_t d_it = 0; d_it < Engine::DIAMOND_MAX; ++d_it) {
+				GetDiamondTemplates().push_back(std::make_unique<SpriteBatch::Template>(
 					mBatches[Engine::IMAGE_DIAMONDS]->createTemplate(
-						glm::vec4(t_it * x_step, 1.f, (t_it + 1) * x_step, 0.f))));
+						glm::vec4(d_it * x_step, 1.f, (d_it + 1) * x_step, 0.f))));
 			}
 		}
 
 		// TODO: Cache font glyphs
-
-		// Associate sprite templates to batches
-		mTemplateBatchMap[Engine::SPRITE_CHAR] = Engine::IMAGE_TEXT;
 	}
 
 	void Engine::Implementation::InitSpriteIntances() {
 		// Create an instance for the cell sprite
-		auto& sprite_batch = mBatches[mTemplateBatchMap[Engine::SPRITE_CELL_EMPTY]];
+		auto& sprite_batch = GetBackgroundBatch();
 
 		int32_t n_cells = GetNumOfGridCells();
 		float grid_step = GetCellSize();
@@ -501,8 +503,9 @@ namespace King {
 		int32_t col_id = 0;
 
 		// Create background cell instances
+		auto& templates = GetBackgroundTemplates();
 		for (int32_t i = 0; i < n_cells; ++i) {
-			const auto& sprite_template = mTemplates[Engine::SPRITE_CELL_EMPTY];
+			const auto& sprite_template = templates[Engine::CELL_EMPTY];
 			mBackground[i] = sprite_batch->addInstance(*sprite_template);
 
 			// Step up into the columns
