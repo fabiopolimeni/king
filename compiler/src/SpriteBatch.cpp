@@ -285,7 +285,7 @@ glm::vec2 SpriteBatch::getInstancePosition(const std::shared_ptr<Instance>& inst
 	return glm::vec2(translation);
 }
 
-glm::vec2 SpriteBatch::getInstanceScale(const std::shared_ptr<Instance>& instance) const
+glm::vec2 SpriteBatch::getInstanceSize(const std::shared_ptr<Instance>& instance) const
 {
 	assert(instance->isValid());
 	glm::mat4 transformation = mData[instance->mDataId].mTransform;

@@ -59,9 +59,10 @@ namespace King {
 		void Write(const char* text, float x, float y, float rotation = 0.0f);
 
 		void ChangeCell(int32_t index, Sprite new_template);
-		void UpdateCell(int32_t index, glm::vec2 scale, glm::vec4 color, float rotation);
+		void UpdateCell(int32_t index, glm::vec2 size, glm::vec4 color, float rotation);
 		
-		void UpdateDiamond(int32_t index, glm::vec2 position, glm::vec2 scale, glm::vec4 color, float rotation);
+		void UpdateDiamond(int32_t index, glm::vec2 position, glm::vec2 size, glm::vec4 color, float rotation);
+		void MoveDiamond(int32_t index, glm::vec2 translate, glm::vec2 scale, float rotate);
 		void ChangeDiamond(int32_t index, Sprite new_template);
 		void AddDiamond(int32_t index, Sprite diamond_template);
 		void RemoveDiamond(int32_t index);

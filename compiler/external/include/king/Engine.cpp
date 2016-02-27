@@ -83,8 +83,6 @@ namespace King {
 		std::unique_ptr<SpriteBatch>& GetDiamondBatch();
 		std::unique_ptr<SpriteBatch>& GetTextBatch();
 
-		size_t GetBatchId(Engine::Sprite sprite_template) const;
-
 		void Start();
 		void ParseEvents();
 
@@ -205,7 +203,8 @@ namespace King {
 		transformation = glm::translate(transformation, glm::vec3(x, y, 0.0f));
 		if (rotation) {
 			transformation = glm::rotate(transformation, rotation, glm::vec3(0.0f, 0.0f, 1.0f));
-			transformation = glm::translate(transformation, glm::vec3(-CalculateStringWidth(text)/2.0f, -20.0f, 0.0f));
+			transformation = glm::translate(transformation,
+				glm::vec3(-CalculateStringWidth(text)/2.0f, -20.0f, 0.0f));
 		}
 
 		Write(text, transformation);
@@ -220,20 +219,35 @@ namespace King {
 		grid_batch->swapInstanceTemplate(instance, *sprite_template);
 	}
 
-	void Engine::UpdateCell(int32_t index, glm::vec2 scale, glm::vec4 color, float rotation)
+	void Engine::UpdateCell(int32_t index, glm::vec2 size, glm::vec4 color, float rotation)
 	{
 		assert(index < mPimpl->GetNumOfGridCells());
 		auto& instance = mPimpl->mBackground[index];
 		auto& grid_batch = mPimpl->GetBackgroundBatch();
-		grid_batch->updateInstance(instance, grid_batch->getInstancePosition(instance), scale, color, rotation);
+		grid_batch->updateInstance(instance, grid_batch->getInstancePosition(instance), size, color, rotation);
 	}
 
-	void Engine::UpdateDiamond(int32_t index, glm::vec2 position, glm::vec2 scale, glm::vec4 color, float rotation)
+	void Engine::UpdateDiamond(int32_t index, glm::vec2 position, glm::vec2 size, glm::vec4 color, float rotation)
 	{
 		assert(index < mPimpl->GetNumOfGridCells());
 		auto& instance = mPimpl->mBackground[index];
 		auto& diamonds_batch = mPimpl->GetDiamondBatch();
-		diamonds_batch->updateInstance(instance, position, scale, color, rotation);
+		diamonds_batch->updateInstance(instance, position, size, color, rotation);
+	}
+
+	void Engine::MoveDiamond(int32_t index, glm::vec2 translate, glm::vec2 scale, float rotate)
+	{
+		assert(index < mPimpl->GetNumOfGridCells());
+		auto& diamonds_batch = mPimpl->GetDiamondBatch();
+		auto& instance = mPimpl->mBackground[index];
+
+		// Moving is relative to current instance state.
+		glm::vec2 position = diamonds_batch->getInstancePosition(instance) + translate;
+		glm::vec2 size = diamonds_batch->getInstanceSize(instance) * scale;
+		glm::vec4 color = diamonds_batch->getInstanceColor(instance);
+		float rotation = diamonds_batch->getInstanceRotation(instance) + rotate;
+
+		diamonds_batch->updateInstance(instance, position, size, color, rotation);
 	}
 
 	void Engine::ChangeDiamond(int32_t index, Sprite new_template)
@@ -255,8 +269,7 @@ namespace King {
 		auto& instance = mPimpl->mDiamonds[index];
 		auto& diamonds_batch = mPimpl->GetDiamondBatch();
 		mPimpl->mDiamonds[index] = diamonds_batch->addInstance(*mPimpl->mTemplates[diamond_template]);
-		diamonds_batch->swapInstanceTemplate(instance, *mPimpl->mTemplates[diamond_template]);
-		diamonds_batch->updateInstance(instance, GetCellPosition(index), glm::vec2(float(mPimpl->GetCellSize())));
+		diamonds_batch->updateInstance(instance, GetCellPosition(index), glm::vec2(mPimpl->GetCellSize()));
 	}
 
 	void Engine::RemoveDiamond(int32_t index)
@@ -272,7 +285,8 @@ namespace King {
 	{
 		auto& diamonds_batch = mPimpl->GetDiamondBatch();
 		mPimpl->mPendingDiamonds.push_back(diamonds_batch->addInstance(*mPimpl->mTemplates[diamond_template]));
-		diamonds_batch->updateInstance(mPimpl->mPendingDiamonds.back(), glm::vec2(x, y), glm::vec2(float(mPimpl->GetCellSize())));
+		diamonds_batch->updateInstance(mPimpl->mPendingDiamonds.back(),
+			glm::vec2(x, y), glm::vec2(float(mPimpl->GetCellSize())));
 	}
 
 	int32_t Engine::GetCellIndex(int32_t screen_x, int32_t screen_y) const
@@ -303,11 +317,11 @@ namespace King {
 	{
 		assert(index < mPimpl->GetNumOfGridCells());
 		int32_t row_id = index / mPimpl->GetGridDims();
-		int32_t col_id = index - row_id;
+		int32_t col_id = index - (row_id * mPimpl->GetGridDims());
 
 		return glm::vec2(
-			col_id * mPimpl->GetCellSize() + mPimpl->GetGridStartY(),
-			row_id * mPimpl->GetCellSize() + mPimpl->GetGridStartX());
+			col_id * mPimpl->GetCellSize() + mPimpl->GetGridStartX(),
+			row_id * mPimpl->GetCellSize() + mPimpl->GetGridStartY());
 	}
 
 	bool Engine::IsCellFull(int32_t index) const
@@ -371,11 +385,6 @@ namespace King {
 		return mBatches[Engine::IMAGE_TEXT];
 	}
 
-	size_t Engine::Implementation::GetBatchId(Engine::Sprite sprite_template) const
-	{
-		return mTemplateBatchMap[sprite_template];
-	}
-
 	void Engine::Implementation::Start() {
 		while (!mQuit) {
 			SDL_GL_SwapWindow(mSdlWindow);
@@ -405,6 +414,7 @@ namespace King {
 			// Render all the batches
 			for (auto i = 0; i < Engine::IMAGE_MAX; ++i)
 			{
+				//if (0 == i) continue;
 				auto& sprite_batch = mBatches[i];
 				sprite_batch->flushBuffers();
 				sprite_batch->draw();
@@ -422,7 +432,9 @@ namespace King {
 		std::string vert_shader_file = assets_dir + "/shaders/sprite.vert";
 		std::string frag_shader_file = assets_dir + "/shaders/sprite.frag";
 
-		glm::mat4 projection = glm::ortho(0.0f, static_cast<float>(WindowWidth), 0.0f, static_cast<float>(WindowHeight), -1.0f, 1.0f);
+		glm::mat4 projection = glm::ortho(
+			0.0f, static_cast<float>(WindowWidth),
+			0.0f, static_cast<float>(WindowHeight), -1.0f, 1.0f);
 
 		// Initialise textures and sprite batches
 		for (size_t si = 0; si < Engine::IMAGE_MAX; ++si)
@@ -448,11 +460,12 @@ namespace King {
 			float x_step = float(mTextures[Engine::IMAGE_BACKGROUND]->getHeight()) /
 				float(mTextures[Engine::IMAGE_BACKGROUND]->getWidth());
 
-			for (size_t i = Engine::SPRITE_CELL_EMPTY; i <= Engine::SPRITE_CELL_FORBIDDEN; ++i) {
-				mTemplateBatchMap[i] = Engine::IMAGE_BACKGROUND;
-				mTemplates[i].reset(new SpriteBatch::Template(
+			for (size_t c_it = Engine::SPRITE_CELL_EMPTY; c_it <= Engine::SPRITE_CELL_FORBIDDEN; ++c_it) {
+				mTemplateBatchMap[c_it] = Engine::IMAGE_BACKGROUND;
+				const float t_it = float(c_it - Engine::SPRITE_CELL_EMPTY);
+				mTemplates[c_it].reset(new SpriteBatch::Template(
 					mBatches[Engine::IMAGE_BACKGROUND]->createTemplate(
-						glm::vec4(i * x_step, 1.f, (i + 1) * x_step, 0.f))));
+						glm::vec4(t_it * x_step, 1.f, (t_it + 1) * x_step, 0.f))));
 			}
 		}
 
@@ -461,11 +474,12 @@ namespace King {
 			float x_step = float(mTextures[Engine::IMAGE_DIAMONDS]->getHeight()) /
 				float(mTextures[Engine::IMAGE_DIAMONDS]->getWidth());
 
-			for (size_t i = Engine::SPRITE_BLUE; i <= Engine::SPRITE_WHITE; ++i) {
-				mTemplateBatchMap[i] = Engine::IMAGE_DIAMONDS;
-				mTemplates[i].reset(new SpriteBatch::Template(
+			for (size_t d_it = Engine::SPRITE_BLUE; d_it <= Engine::SPRITE_WHITE; ++d_it) {
+				mTemplateBatchMap[d_it] = Engine::IMAGE_DIAMONDS;
+				const float t_it = float(d_it - Engine::SPRITE_BLUE);
+				mTemplates[d_it].reset(new SpriteBatch::Template(
 					mBatches[Engine::IMAGE_DIAMONDS]->createTemplate(
-						glm::vec4(i * x_step, 1.f, (i + 1) * x_step, 0.f))));
+						glm::vec4(t_it * x_step, 1.f, (t_it + 1) * x_step, 0.f))));
 			}
 		}
 

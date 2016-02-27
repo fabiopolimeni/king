@@ -109,7 +109,7 @@ public:
 
 	// Get instance info
 	glm::vec2 getInstancePosition(const std::shared_ptr<Instance>& instance) const;
-	glm::vec2 getInstanceScale(const std::shared_ptr<Instance>& instance) const;
+	glm::vec2 getInstanceSize(const std::shared_ptr<Instance>& instance) const;
 	float getInstanceRotation(const std::shared_ptr<Instance>& instance) const;
 	glm::vec4 getInstanceColor(const std::shared_ptr<Instance>& instance) const;
 
