@@ -27,7 +27,7 @@ namespace King {
 	static const float MaxFrameTicks = 300.0f;
 	static const float TextScale = 0.5f;
 	
-	const static size_t GRID_SIZE = 8;
+	const static size_t GRID_DIM = 8;
 	const static size_t MAX_GLYPHS = 256;
 
 	struct Engine::Implementation {
@@ -42,10 +42,10 @@ namespace King {
 		typedef std::vector<std::unique_ptr<SpriteBatch::Template>> TemplateSet;
 		std::array<TemplateSet, Engine::IMAGE_MAX> mTemplates;
 
-		std::shared_ptr<SpriteBatch::Instance> mBackground[GRID_SIZE * GRID_SIZE];
+		std::shared_ptr<SpriteBatch::Instance> mBackground[GRID_DIM * GRID_DIM];
 		
-		std::shared_ptr<SpriteBatch::Instance> mDiamonds[GRID_SIZE * GRID_SIZE];
-		Engine::Diamond mDiamondsTemplateMap[GRID_SIZE * GRID_SIZE];
+		std::shared_ptr<SpriteBatch::Instance> mDiamonds[GRID_DIM * GRID_DIM];
+		Engine::Diamond mDiamondsTemplateMap[GRID_DIM * GRID_DIM];
 
 		std::shared_ptr<SpriteBatch::Instance> mText[MAX_GLYPHS];
 
@@ -59,6 +59,9 @@ namespace King {
 		float mMouseX;
 		float mMouseY;
 		bool mMouseButtonDown;
+		uint8_t mMouseButtonsMask;
+
+		bool mKeyDown[256];
 		
 		Implementation()
 			: mSdl(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_NOPARACHUTE)
@@ -68,10 +71,17 @@ namespace King {
 			, mMouseX(WindowWidth * 0.5f)
 			, mMouseY(WindowHeight * 0.5f)
 			, mMouseButtonDown(false)
+			, mMouseButtonsMask(0x0)
 			, mQuit(false)
 			, mUpdater(nullptr)
 			, mElapsedTicks(static_cast<float>(SDL_GetTicks()))
 		{
+			memset(mKeyDown, 0, sizeof(mKeyDown));
+		}
+
+		~Implementation()
+		{
+			mUpdater = nullptr;
 		}
 
 		int32_t GetGridDims() const;
@@ -133,8 +143,16 @@ namespace King {
 		return mPimpl->mMouseY;
 	}
 
-	bool Engine::IsMouseButtonDown() const {
-		return mPimpl->mMouseButtonDown;
+	bool Engine::IsMouseButtonDown(uint8_t index) const {
+		
+		return (
+			mPimpl->mMouseButtonDown &&
+			mPimpl->mMouseButtonsMask & (1 << index));
+	}
+
+	bool Engine::IsKeyDown(uint8_t key) const
+	{
+		return mPimpl->mKeyDown[key];
 	}
 	
 	void Engine::Quit() {
@@ -224,6 +242,19 @@ namespace King {
 		grid_batch->updateInstance(instance, grid_batch->getInstancePosition(instance), size, color, rotation);
 	}
 
+	void Engine::GetDiamondData(int32_t index, glm::vec2 & position, glm::vec2 & size, glm::vec4 & color, float & rotation) const
+	{
+		assert(index < mPimpl->GetNumOfGridCells());
+		auto& diamonds_batch = mPimpl->GetDiamondBatch();
+		auto& instance = mPimpl->mDiamonds[index];
+
+		// Moving is relative to current instance state.
+		position = diamonds_batch->getInstancePosition(instance);
+		size = diamonds_batch->getInstanceSize(instance);
+		color = diamonds_batch->getInstanceColor(instance);
+		rotation = diamonds_batch->getInstanceRotation(instance);
+	}
+
 	void Engine::UpdateDiamond(int32_t index, glm::vec2 position, glm::vec2 size, glm::vec4 color, float rotation)
 	{
 		assert(index < mPimpl->GetNumOfGridCells());
@@ -277,6 +308,7 @@ namespace King {
 		{
 			auto& diamonds_batch = mPimpl->GetDiamondBatch();
 			diamonds_batch->removeInstance(mPimpl->mDiamonds[index]);
+			mPimpl->mDiamonds[index] = nullptr;
 		}
 	}
 
@@ -349,11 +381,16 @@ namespace King {
 		return index - (GetGriRow(index) * mPimpl->GetGridDims());
 	}
 
-	Engine::Diamond Engine::GetDiamond(int32_t grid_x, int32_t gird_y) const
+	int32_t Engine::GetGridSize() const
 	{
-		auto grid_index = GetGridIndex(grid_x, gird_y);
-		return IsCellFull(grid_index)
-			? mPimpl->mDiamondsTemplateMap[grid_index]
+		return mPimpl->GetNumOfGridCells();
+	}
+
+	Engine::Diamond Engine::GetGridDiamond(int32_t index) const
+	{
+		assert(index < mPimpl->GetNumOfGridCells());
+		return IsCellFull(index)
+			? mPimpl->mDiamondsTemplateMap[index]
 			: Diamond::DIAMOND_MAX;
 	}
 
@@ -380,7 +417,7 @@ namespace King {
 	//////////////////////////////////////////////////////////////////////////
 
 	int32_t Engine::Implementation::GetGridDims() const {
-		return GRID_SIZE;
+		return GRID_DIM;
 	}
 
 	int32_t Engine::Implementation::GetGridStartX() const {
@@ -577,18 +614,32 @@ namespace King {
 		while (SDL_PollEvent(&event)) {
 			switch (event.type) {
 			case SDL_KEYDOWN: {
+				if (event.key.keysym.sym < std::numeric_limits<uint8_t>::max()) {
+					mKeyDown[event.key.keysym.sym] = true;
+				}
+
 				if (event.key.keysym.sym == SDLK_ESCAPE) {
 					mQuit = true;
 				}
+
+				break;
+			}
+			case SDL_KEYUP: {
+				if (event.key.keysym.sym < std::numeric_limits<uint8_t>::max()) {
+					mKeyDown[event.key.keysym.sym] = false;
+				}
+
 				break;
 			}
 			case SDL_QUIT:
 				mQuit = true;
 				break;
 			case SDL_MOUSEBUTTONDOWN:
+				mMouseButtonsMask |= (1 << event.button.button);
 				mMouseButtonDown = true;
 				break;
 			case SDL_MOUSEBUTTONUP:
+				mMouseButtonsMask &= ~(1 << event.button.button);
 				mMouseButtonDown = false;
 				break;
 			case SDL_MOUSEMOTION:

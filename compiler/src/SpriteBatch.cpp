@@ -77,30 +77,36 @@ namespace
 
 	void updateBuffer(gl::enumerator buff_type, gl::uint32 ubo, uint8_t* buffer, gl::int32 offset, gl::sizei size)
 	{
-		// uniform buffer object needs to be bound with std140 layout attribute
-		glBindBuffer(buff_type, ubo);
-		uint8_t* buffer_ptr = (uint8_t*)glMapBufferRange(buff_type, offset,
-			size, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
+		if (size > 0) {
 
-		// copy memory into the buffer
-		memcpy(buffer_ptr, buffer, size);
+			// uniform buffer object needs to be bound with std140 layout attribute
+			glBindBuffer(buff_type, ubo);
+			uint8_t* buffer_ptr = (uint8_t*)glMapBufferRange(buff_type, offset,
+				size, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
 
-		// make sure the uniform buffer is uploaded
-		glUnmapBuffer(buff_type);
+			// copy memory into the buffer
+			memcpy(buffer_ptr, buffer, size);
+
+			// make sure the uniform buffer is uploaded
+			glUnmapBuffer(buff_type);
+		}
 	}
 
 	void fillBuffer(gl::enumerator buff_type, gl::uint32 ubo, uint8_t* buffer, gl::sizei size)
 	{
-		// uniform buffer object needs to be bound with std140 layout attribute
-		glBindBuffer(buff_type, ubo);
-		uint8_t* buffer_ptr = (uint8_t*)glMapBufferRange(buff_type, 0,
-			size, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
+		if (size > 0) {
 
-		// copy memory into the buffer
-		memcpy(buffer_ptr, buffer, size);
+			// uniform buffer object needs to be bound with std140 layout attribute
+			glBindBuffer(buff_type, ubo);
+			uint8_t* buffer_ptr = (uint8_t*)glMapBufferRange(buff_type, 0,
+				size, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
 
-		// make sure the uniform buffer is uploaded
-		glUnmapBuffer(buff_type);
+			// copy memory into the buffer
+			memcpy(buffer_ptr, buffer, size);
+
+			// make sure the uniform buffer is uploaded
+			glUnmapBuffer(buff_type);
+		}
 	}
 
 	void releaseBuffer(gl::uint32& ubo)

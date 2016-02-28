@@ -55,7 +55,8 @@ namespace King {
 		float GetLastFrameSeconds() const;
 		float GetMouseX() const;
 		float GetMouseY() const;
-		bool IsMouseButtonDown() const;
+		bool IsMouseButtonDown(uint8_t index) const;
+		bool IsKeyDown(uint8_t key) const;
 		
 		void Start(Updater& updater);
 		void Quit();
@@ -66,6 +67,7 @@ namespace King {
 		void ChangeCell(int32_t index, Background new_template);
 		void UpdateCell(int32_t index, glm::vec2 size, glm::vec4 color, float rotation);
 		
+		void GetDiamondData(int32_t index, glm::vec2& position, glm::vec2& size, glm::vec4& color, float& rotation) const;
 		void UpdateDiamond(int32_t index, glm::vec2 position, glm::vec2 size, glm::vec4 color, float rotation);
 		void MoveDiamond(int32_t index, glm::vec2 translate, glm::vec2 scale, float rotate);
 		void ChangeDiamond(int32_t index, Diamond new_template);
@@ -81,8 +83,9 @@ namespace King {
 		int32_t GetGridIndex(int32_t grid_x, int32_t gird_y) const;
 		int32_t GetGriRow(int32_t index) const;
 		int32_t GetGridColumn(int32_t index) const;
+		int32_t GetGridSize() const;
 
-		Diamond GetDiamond(int32_t grid_x, int32_t gird_y) const;
+		Diamond GetGridDiamond(int32_t index) const;
 
 		int32_t GetGridWidth() const;
 		int32_t GetGridHeight() const;
