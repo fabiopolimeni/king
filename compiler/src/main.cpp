@@ -9,23 +9,27 @@
 
 #include <glm/vec2.hpp>
 #include <glm/vec4.hpp>
+#include <glm/common.hpp>
 
 //**********************************************************************
 
 using namespace King;
 class ExampleGame : public King::Updater
 {
-	static const int32_t CHECK_STEPS = 2;
-	static const int32_t MAX_INIT_HEIGHT = 4;
+	static const int32_t CHECK_STEPS;
+	static const int32_t MAX_INIT_HEIGHT;
+	static const float FALLING_TIME;
 
-	struct DiamondTarget
+	struct DataTarget
 	{
 		glm::vec2 position;
 		glm::vec2 size;
 		glm::vec4 color;
 		float rotation;
-		int32_t index;
 		float time;
+		float life;
+		int32_t index;
+		Engine::Diamond type;
 	};
 
 	enum class GameState
@@ -33,8 +37,11 @@ class ExampleGame : public King::Updater
 		INVALID,		
 		INIT,			// Game started, grid initialised, but match didn't begin yet.
 		MATCH_BEGUN,	// Match is begun
-		PLAYER_THINKING,// Waiting for player's move
-		GRID_UPDATING,	// Grid is resolving, moving, exploding, spawning
+		GRID_EXPLODING,	// Grid is resolving, moving, exploding, spawning
+		GRID_FALLING,	// Grid is resolving, moving, exploding, spawning
+		GRID_SPAWNING,	// Grid is resolving, moving, exploding, spawning
+		PLAYER_MOVING,	// Player is acting on the grid
+		PLAYER_WAITING, //Waiting for player's to move
 		MATCH_PAUSE,	// Match is in pause, (advantage for the player? we might want to hide the diamonds)
 		MATCH_END,		// The match ended, but the game is still running, waiting for the player to restart or quit
 		END				// Player quit
@@ -61,7 +68,7 @@ class ExampleGame : public King::Updater
 
 	GameState mGameState;
 	std::unique_ptr<DiamondState> mDiamondStates;
-	std::vector<DiamondTarget> mUpdatingDiamonds;
+	std::vector<DataTarget> mUpdatingDiamonds;
 
 private:
 
@@ -85,20 +92,37 @@ private:
 
 		// Grid starts empty
 		memset(mDiamondStates.get(), (uint8_t)DiamondState::EMPTY, sizeof(uint8_t) * mEngine.GetGridSize());
+		mUpdatingDiamonds.clear();
 
-		// Fill first max rows, per column
-		for (int32_t c = 0; c < mEngine.GetGridHeight(); ++c) {
+		// Debug
+		mEngine.AddDiamond(0, Engine::DIAMOND_PURPLE);
+		mDiamondStates.get()[0] = DiamondState::READY;
 
-			int32_t rows = row_dis(row_gen);
-			for (int32_t r = 0; r < rows; ++r) {
+		mEngine.AddDiamond(8, Engine::DIAMOND_PURPLE);
+		mDiamondStates.get()[8] = DiamondState::READY;
 
-				auto grid_index = mEngine.GetGridIndex(c, r);
-				Engine::Diamond diamond = static_cast<Engine::Diamond>(diamond_dis(diamond_gen));
+		mEngine.AddDiamond(16, Engine::DIAMOND_RED);
+		mDiamondStates.get()[16] = DiamondState::READY;
 
-				mEngine.AddDiamond(grid_index, diamond);
-				mDiamondStates.get()[grid_index] = DiamondState::READY;
-			}
-		}
+		mEngine.AddDiamond(24, Engine::DIAMOND_YELLOW);
+		mDiamondStates.get()[24] = DiamondState::READY;
+
+
+		//// Fill first max rows, per column
+		//for (int32_t c = 0; c < mEngine.GetGridHeight(); ++c) {
+
+		//	int32_t rows = row_dis(row_gen);
+		//	for (int32_t r = 0; r < rows; ++r) {
+
+		//		auto grid_index = mEngine.GetGridIndex(c, r);
+		//		Engine::Diamond diamond = static_cast<Engine::Diamond>(diamond_dis(diamond_gen));
+
+		//		mEngine.AddDiamond(grid_index, diamond);
+		//		mDiamondStates.get()[grid_index] = DiamondState::READY;
+		//	}
+		//}
+
+		SetGameState(GameState::INIT);
 	}
 
 	void ClearGrid() {
@@ -267,30 +291,43 @@ private:
 	}
 
 	// Check whether any of the column needs to start falling and mark cells accordingly
-	bool CheckColumnFalling() {
+	bool CheckFalling(float falling_time) {
 
 		bool any_moving = false;
 
 		// Iterate through grid rows and resolve adjacencies
 		for (int32_t x = 0; x < mEngine.GetGridWidth(); ++x) {
-			for (int32_t y = 0; y < mEngine.GetGridHeight(); ++y) {
+			for (int32_t y = 1; y < mEngine.GetGridHeight(); ++y) {
 
-				const auto index = mEngine.GetGridIndex(x, y);
-				DiamondState& diamond_state = mDiamondStates.get()[index];
+				const auto curr_index = mEngine.GetGridIndex(x, y);
+				DiamondState& cur_diamond = mDiamondStates.get()[curr_index];
 
-				// If the current cell is empty and the one above of us is not,
-				// then, we want to set the top diamond to empty, and the current
-				// one to updating, set the target info to the current position
-				int32_t above_index = y + 1;
-				if (diamond_state == DiamondState::EMPTY && above_index < mEngine.GetGridHeight()) {
+				// If the current cell is not empty and the one below of us is,
+				// then, we want to set the current diamond position to empty,
+				// one to updating, set the target info to the current position.
+				
+				const int32_t below_index = mEngine.GetGridIndex(x, y - 1); // It always exists as we start from row 1
+				DiamondState& below_diamond = mDiamondStates.get()[below_index];
+				if (cur_diamond != DiamondState::EMPTY && below_diamond == DiamondState::EMPTY) {
 					
-					DiamondState& diamond_above = mDiamondStates.get()[above_index];
-					diamond_above = DiamondState::EMPTY;
-					diamond_state = DiamondState::UPDATING;
+					DataTarget cur_target;
+					mEngine.GetDiamondData(curr_index, cur_target.position, cur_target.size, cur_target.color, cur_target.rotation);
+					cur_target.position = mEngine.GetCellPosition(below_index);
+					cur_target.time = falling_time;
+					cur_target.life = falling_time;
+					cur_target.index = below_index;
+					cur_target.type = mEngine.GetGridDiamond(curr_index);
 
-					mUpdatingDiamonds.push_back({
+					mUpdatingDiamonds.push_back(cur_target);
 
-					});
+					// Add a new diamond into the below position which we update with the current data
+					mEngine.AddDiamond(below_index, mEngine.GetGridDiamond(curr_index));
+					mEngine.UpdateDiamond(below_index, mEngine.GetCellPosition(curr_index), cur_target.size, cur_target.color, cur_target.rotation);
+					below_diamond = DiamondState::UPDATING;
+
+					// We now remove the diamond from the current position.
+					mEngine.RemoveDiamond(curr_index);
+					cur_diamond = DiamondState::EMPTY;
 
 					any_moving = true;
 				}
@@ -301,7 +338,7 @@ private:
 	}
 
 	// Check whether all the non empty cells have diamonds in ready state
-	bool IsGridReady() {
+	bool IsGridReady() const {
 
 		for (auto i = 0; i < mEngine.GetGridSize(); ++i) {
 
@@ -312,6 +349,19 @@ private:
 		}
 
 		return true;
+	}
+
+	bool IsGridUpdating() const {
+
+		return IsGameState(GameState::GRID_EXPLODING)
+			|| IsGameState(GameState::GRID_FALLING)
+			|| IsGameState(GameState::GRID_SPAWNING)
+			|| IsGameState(GameState::PLAYER_MOVING);
+	}
+
+	bool IsGameBegun() const {
+
+		return mGameState >= GameState::MATCH_BEGUN;
 	}
 
 	// Keep animating the diamonds until all become ready
@@ -325,9 +375,48 @@ private:
 			SetGameState(GameState::MATCH_BEGUN);
 		}
 
-		return IsGameState(GameState::MATCH_BEGUN);
+		return IsGameBegun();
 	}
 
+	// Advance a single diamond by one step
+	// Returns false if it finished to update
+	bool AdvanceDiamond(DataTarget& diamond_data, float time_step) {
+
+		bool finished = false;
+
+		diamond_data.life -= time_step;
+		if (diamond_data.life <= 0.f) {
+			diamond_data.life = 0.f;
+			finished = true;
+		}
+
+		float stamp = 1.f - diamond_data.life / diamond_data.time;
+
+		glm::vec2 position;
+		glm::vec2 size;
+		glm::vec4 color;
+		float rotation;
+		mEngine.GetDiamondData(diamond_data.index, position, size, color, rotation);
+		mEngine.UpdateDiamond(diamond_data.index, 
+			glm::mix(position, diamond_data.position, stamp),
+			glm::mix(size, diamond_data.size, stamp),
+			glm::mix(color, diamond_data.color, stamp),
+			glm::mix(rotation, diamond_data.rotation, stamp));
+
+		return !finished;
+	}
+
+	// Update all diamonds
+	void UpdateGrid(float delta_time) {
+
+		for (size_t i = 0; i < mUpdatingDiamonds.size(); ++i) {
+
+			auto& diamond_data = mUpdatingDiamonds[i];
+			if (!AdvanceDiamond(diamond_data, delta_time)) {
+				mDiamondStates.get()[diamond_data.index] = DiamondState::READY;
+			}
+		}
+	}
 
 	////////////////////////////////////////////////
 
@@ -337,15 +426,13 @@ private:
 
 			std::random_device rd;
 			std::mt19937 gen(rd());
+			std::binomial_distribution<> dis(Engine::DIAMOND_YELLOW, 0.5f);
 
-			//std::uniform_int_distribution<> dis(0, King::Engine::DIAMOND_YELLOW);
-			std::binomial_distribution<> dis(King::Engine::DIAMOND_YELLOW, 0.5f);
-
-			King::Engine::Diamond diamond = static_cast<King::Engine::Diamond>(dis(gen));
+			Engine::Diamond diamond = static_cast<Engine::Diamond>(dis(gen));
 
 			auto cell_index = mEngine.GetCellIndex(int32_t(mEngine.GetMouseX()), int32_t(mEngine.GetMouseY()));
 			if (cell_index >= 0) {
-				mEngine.ChangeCell(cell_index, King::Engine::CELL_FULL);
+				mEngine.ChangeCell(cell_index, Engine::CELL_FULL);
 
 				// Generate random diamond
 				if (!mEngine.IsCellFull(cell_index)) {
@@ -406,7 +493,6 @@ public:
 
 	bool Init() {
 		InitGrid(MAX_INIT_HEIGHT);
-		SetGameState(GameState::INIT);
 		return true;
 	}
 
@@ -422,7 +508,6 @@ public:
 		{
 			ClearGrid();
 			InitGrid(MAX_INIT_HEIGHT);
-			SetGameState(GameState::INIT);
 		}
 
 		// Check whether the match started
@@ -431,14 +516,38 @@ public:
 		}
 
 		// Check we need to resolve the grid
-		if (!IsGameState(GameState::GRID_UPDATING)) {
+		if (!IsGridUpdating()) {
 
 			// We have to run a two step pass, as removable row
 			// diamonds can still account for column explosions,
 			// and vice versa.
 			if (CheckAdjacencies()) {
 				ResolveExplosions();
-				CheckColumnFalling();
+				SetGameState(GameState::GRID_EXPLODING);
+				return;
+			}
+
+			// If we have exploded some of the diamonds
+			// we have to check for falling ones.
+			if (CheckFalling(FALLING_TIME)) {
+				SetGameState(GameState::GRID_FALLING);
+				return;
+			}
+
+			// TODO: If round is at end and we need to spawn new diamonds
+
+		}
+		else {
+
+			// Update pending diamonds
+			UpdateGrid(mEngine.GetLastFrameSeconds());
+			
+			// Signal that we have finished to update
+			// and we are waiting for the player to
+			// make a move
+			if (IsGridReady()) {
+				mUpdatingDiamonds.clear();
+				SetGameState(GameState::PLAYER_WAITING);
 			}
 		}
 
@@ -451,6 +560,10 @@ private:
 };
 
 //**********************************************************************
+// Simple configurations
+const int32_t ExampleGame::CHECK_STEPS = 2;
+const int32_t ExampleGame::MAX_INIT_HEIGHT = 4;
+const float ExampleGame::FALLING_TIME = 1.3f;
 
 int main(int argc, char *argv[])
 {
