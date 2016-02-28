@@ -19,6 +19,7 @@ class ExampleGame : public King::Updater
 	static const int32_t CHECK_STEPS;
 	static const int32_t MAX_INIT_HEIGHT;
 	static const float FALLING_TIME;
+	static const float ROUND_TIME;
 
 	struct DataTarget
 	{
@@ -70,6 +71,8 @@ class ExampleGame : public King::Updater
 	std::unique_ptr<DiamondState> mDiamondStates;
 	std::vector<DataTarget> mUpdatingDiamonds;
 
+	float mRoundTime;
+
 private:
 
 	bool IsGameState(GameState state) const {
@@ -94,33 +97,36 @@ private:
 		memset(mDiamondStates.get(), (uint8_t)DiamondState::EMPTY, sizeof(uint8_t) * mEngine.GetGridSize());
 		mUpdatingDiamonds.clear();
 
-		// Debug
-		mEngine.AddDiamond(0, Engine::DIAMOND_PURPLE);
-		mDiamondStates.get()[0] = DiamondState::READY;
+		// Restart round timer
+		mRoundTime = ROUND_TIME;
 
-		mEngine.AddDiamond(8, Engine::DIAMOND_PURPLE);
-		mDiamondStates.get()[8] = DiamondState::READY;
+		//// Debug
+		//mEngine.AddDiamond(0, Engine::DIAMOND_PURPLE);
+		//GetDiamondState(0] = DiamondState::READY;
 
-		mEngine.AddDiamond(16, Engine::DIAMOND_RED);
-		mDiamondStates.get()[16] = DiamondState::READY;
+		//mEngine.AddDiamond(8, Engine::DIAMOND_PURPLE);
+		//GetDiamondState(8] = DiamondState::READY;
 
-		mEngine.AddDiamond(24, Engine::DIAMOND_YELLOW);
-		mDiamondStates.get()[24] = DiamondState::READY;
+		//mEngine.AddDiamond(16, Engine::DIAMOND_RED);
+		//GetDiamondState(16] = DiamondState::READY;
+
+		//mEngine.AddDiamond(24, Engine::DIAMOND_YELLOW);
+		//GetDiamondState(24] = DiamondState::READY;
 
 
-		//// Fill first max rows, per column
-		//for (int32_t c = 0; c < mEngine.GetGridHeight(); ++c) {
+		// Fill first max rows, per column
+		for (int32_t c = 0; c < mEngine.GetGridHeight(); ++c) {
 
-		//	int32_t rows = row_dis(row_gen);
-		//	for (int32_t r = 0; r < rows; ++r) {
+			int32_t rows = row_dis(row_gen);
+			for (int32_t r = 0; r < rows; ++r) {
 
-		//		auto grid_index = mEngine.GetGridIndex(c, r);
-		//		Engine::Diamond diamond = static_cast<Engine::Diamond>(diamond_dis(diamond_gen));
+				auto grid_index = mEngine.GetGridIndex(c, r);
+				Engine::Diamond diamond = static_cast<Engine::Diamond>(diamond_dis(diamond_gen));
 
-		//		mEngine.AddDiamond(grid_index, diamond);
-		//		mDiamondStates.get()[grid_index] = DiamondState::READY;
-		//	}
-		//}
+				mEngine.AddDiamond(grid_index, diamond);
+				GetDiamondState(grid_index) = DiamondState::READY;
+			}
+		}
 
 		SetGameState(GameState::INIT);
 	}
@@ -197,14 +203,14 @@ private:
 	void ExplodeRow(const int32_t x, const int32_t y, const int32_t steps) {
 
 		for (auto i = 0; i < steps; ++i) {
-			mDiamondStates.get()[mEngine.GetGridIndex(x + i, y)] = DiamondState::EXPLOD;
+			GetDiamondState(mEngine.GetGridIndex(x + i, y)) = DiamondState::EXPLOD;
 		}
 	}
 
 	void ExplodeColumn(const int32_t x, const int32_t y, const int32_t steps) {
 
 		for (auto i = 0; i < steps; ++i) {
-			mDiamondStates.get()[mEngine.GetGridIndex(x, y + i)] = DiamondState::EXPLOD;
+			GetDiamondState(mEngine.GetGridIndex(x, y + i)) = DiamondState::EXPLOD;
 		}
 	}
 
@@ -281,7 +287,7 @@ private:
 
 		for (auto i = 0; i < mEngine.GetGridSize(); ++i) {
 
-			DiamondState& diamond_state = mDiamondStates.get()[i];
+			DiamondState& diamond_state = GetDiamondState(i);
 			if (diamond_state == DiamondState::EXPLOD) {
 				diamond_state = DiamondState::EMPTY;
 				mEngine.RemoveDiamond(i);
@@ -300,14 +306,17 @@ private:
 			for (int32_t y = 1; y < mEngine.GetGridHeight(); ++y) {
 
 				const auto curr_index = mEngine.GetGridIndex(x, y);
-				DiamondState& cur_diamond = mDiamondStates.get()[curr_index];
+				DiamondState& cur_diamond = GetDiamondState(curr_index);
 
 				// If the current cell is not empty and the one below of us is,
 				// then, we want to set the current diamond position to empty,
 				// one to updating, set the target info to the current position.
 				
-				const int32_t below_index = mEngine.GetGridIndex(x, y - 1); // It always exists as we start from row 1
-				DiamondState& below_diamond = mDiamondStates.get()[below_index];
+				//const int32_t below_index = mEngine.GetGridIndex(x, y - 1); // It always exists as we start from row 1
+				const int32_t below_index = GetLowestIndex(x, y);
+				if (below_index == curr_index) continue;
+
+				DiamondState& below_diamond = GetDiamondState(below_index);
 				if (cur_diamond != DiamondState::EMPTY && below_diamond == DiamondState::EMPTY) {
 					
 					DataTarget cur_target;
@@ -340,9 +349,9 @@ private:
 	// Check whether all the non empty cells have diamonds in ready state
 	bool IsGridReady() const {
 
-		for (auto i = 0; i < mEngine.GetGridSize(); ++i) {
+		for (int32_t i = 0; i < mEngine.GetGridSize(); ++i) {
 
-			DiamondState& diamond_state = mDiamondStates.get()[i];
+			const DiamondState& diamond_state = GetDiamondState(i);
 			if (diamond_state != DiamondState::EMPTY && diamond_state != DiamondState::READY) {
 				return false;
 			}
@@ -358,15 +367,10 @@ private:
 			|| IsGameState(GameState::GRID_SPAWNING)
 			|| IsGameState(GameState::PLAYER_MOVING);
 	}
+	
+	bool IsMatching() const {
 
-	bool IsGameBegun() const {
-
-		return mGameState >= GameState::MATCH_BEGUN;
-	}
-
-	// Keep animating the diamonds until all become ready
-	void AnimateGrid(float delta_time) {
-
+		return mGameState >= GameState::MATCH_BEGUN && mGameState < GameState::MATCH_END;
 	}
 
 	bool CheckGameBegins() {
@@ -375,7 +379,7 @@ private:
 			SetGameState(GameState::MATCH_BEGUN);
 		}
 
-		return IsGameBegun();
+		return IsMatching();
 	}
 
 	// Advance a single diamond by one step
@@ -413,9 +417,80 @@ private:
 
 			auto& diamond_data = mUpdatingDiamonds[i];
 			if (!AdvanceDiamond(diamond_data, delta_time)) {
-				mDiamondStates.get()[diamond_data.index] = DiamondState::READY;
+				GetDiamondState(diamond_data.index) = DiamondState::READY;
 			}
 		}
+	}
+
+	// Return the diamond state
+	DiamondState GetDiamondState(int32_t index) const {
+		assert(index < mEngine.GetGridSize());
+		return mDiamondStates.get()[index];
+	}
+
+	// Return the diamond state
+	DiamondState& GetDiamondState(int32_t index) {
+		assert(index < mEngine.GetGridSize());
+		return mDiamondStates.get()[index];
+	}
+
+	// Given a position in the grid returns the lowest available index on the same column.
+	// It returns -1 if the given position is already full.
+	int32_t GetLowestIndex(const int32_t column, const int32_t row) const {
+
+		int32_t lowest_index = mEngine.GetGridIndex(column, row);
+		for (int32_t y = row; y >= 0; --y) {
+
+			auto index = mEngine.GetGridIndex(column, y);
+			if (GetDiamondState(index) == DiamondState::EMPTY) {
+				assert(!mEngine.IsCellFull(index));
+				lowest_index = index;
+			}
+		}
+
+		return lowest_index;
+	}
+
+	void SpawnDiamond() {
+
+		std::random_device rd;
+
+		std::mt19937 row_gen(rd());
+		std::uniform_int_distribution<> col_dis(0, mEngine.GetGridWidth() - 1);
+
+		std::mt19937 diamond_gen(rd());
+		std::uniform_int_distribution<> diamond_dis(0, Engine::DIAMOND_YELLOW);
+
+		// Pick the column we want to spawn the object
+		int32_t column = col_dis(row_gen);
+
+		// If this column is not saturated, then spawn a new diamond, end the match otherwise.
+		auto grid_index = mEngine.GetGridIndex(column, mEngine.GetGridHeight() - 1);
+		//auto grid_index = LowestFreeCell(column, mEngine.GetGridHeight() - 1);
+		//if (grid_index >= 0) {
+		if (GetDiamondState(grid_index) == DiamondState::EMPTY) {
+
+			// Random diamond
+			Engine::Diamond diamond = static_cast<Engine::Diamond>(diamond_dis(diamond_gen));
+
+			mEngine.AddDiamond(grid_index, diamond);
+			GetDiamondState(grid_index) = DiamondState::SPAWNING;
+		}
+		else {
+
+			EndMatch();
+		}
+	}
+
+	void RestartMatch() {
+
+		ClearGrid();
+		InitGrid(MAX_INIT_HEIGHT);
+	}
+
+	void EndMatch() {
+
+		SetGameState(GameState::MATCH_END);
 	}
 
 	////////////////////////////////////////////////
@@ -481,6 +556,7 @@ public:
 		: mEngine("./assets")
 		, mGameState(GameState::INVALID)
 		, mDiamondStates(new DiamondState[mEngine.GetGridSize()])
+		, mRoundTime(ROUND_TIME)
 	{
 	}
 
@@ -501,13 +577,12 @@ public:
 		if (Testing()) {
 			return;
 		}
+
+		const float delta_time = mEngine.GetLastFrameSeconds();
 		
 		// Check the user wants to restart the match
-		if ((IsGameState(GameState::MATCH_BEGUN) || IsGameState(GameState::MATCH_END))
-			&& mEngine.IsKeyDown('r'))
-		{
-			ClearGrid();
-			InitGrid(MAX_INIT_HEIGHT);
+		if (IsMatching() && mEngine.IsKeyDown('r')) {
+			RestartMatch();
 		}
 
 		// Check whether the match started
@@ -516,7 +591,14 @@ public:
 		}
 
 		// Check we need to resolve the grid
-		if (!IsGridUpdating()) {
+		//if (!IsGridUpdating()) {
+		if (IsGridReady()) {
+
+			// Check whether we need to spawn a new diamond
+			if (mRoundTime <= 0.f) {
+				mRoundTime = ROUND_TIME;
+				SpawnDiamond();
+			}
 
 			// We have to run a two step pass, as removable row
 			// diamonds can still account for column explosions,
@@ -524,14 +606,12 @@ public:
 			if (CheckAdjacencies()) {
 				ResolveExplosions();
 				SetGameState(GameState::GRID_EXPLODING);
-				return;
 			}
 
 			// If we have exploded some of the diamonds
 			// we have to check for falling ones.
 			if (CheckFalling(FALLING_TIME)) {
 				SetGameState(GameState::GRID_FALLING);
-				return;
 			}
 
 			// TODO: If round is at end and we need to spawn new diamonds
@@ -540,7 +620,7 @@ public:
 		else {
 
 			// Update pending diamonds
-			UpdateGrid(mEngine.GetLastFrameSeconds());
+			UpdateGrid(delta_time);
 			
 			// Signal that we have finished to update
 			// and we are waiting for the player to
@@ -550,6 +630,9 @@ public:
 				SetGameState(GameState::PLAYER_WAITING);
 			}
 		}
+
+		// Decrement round timer
+		mRoundTime -= delta_time;
 
 		// Check whether the match ended or the player won
 	}
@@ -563,7 +646,9 @@ private:
 // Simple configurations
 const int32_t ExampleGame::CHECK_STEPS = 2;
 const int32_t ExampleGame::MAX_INIT_HEIGHT = 4;
-const float ExampleGame::FALLING_TIME = 1.3f;
+
+const float ExampleGame::FALLING_TIME = 0.6f;
+const float ExampleGame::ROUND_TIME = 2.f;
 
 int main(int argc, char *argv[])
 {
@@ -580,5 +665,3 @@ int main(int argc, char *argv[])
 
 	return 0;
 }
-
-
