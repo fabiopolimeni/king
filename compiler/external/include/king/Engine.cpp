@@ -588,7 +588,7 @@ namespace King {
 		// Create background cell instances
 		auto& templates = GetBackgroundTemplates();
 		for (int32_t i = 0; i < n_cells; ++i) {
-			const auto& sprite_template = templates[Engine::CELL_EMPTY];
+			const auto& sprite_template = templates[Engine::CELL_NEUTRAL];
 			mBackground[i] = sprite_batch->addInstance(*sprite_template);
 
 			// Step up into the columns
