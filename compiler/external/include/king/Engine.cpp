@@ -32,6 +32,7 @@ namespace King {
 	
 	const static size_t GRID_DIM = 8;
 	const static size_t MAX_GLYPHS = 256;
+	const static size_t MAX_CHARS = 256;
 
 	struct Engine::Implementation {
 		
@@ -50,7 +51,8 @@ namespace King {
 		std::shared_ptr<SpriteBatch::Instance> mDiamonds[GRID_DIM * GRID_DIM];
 		Engine::Diamond mDiamondsTemplateMap[GRID_DIM * GRID_DIM];
 
-		std::shared_ptr<SpriteBatch::Instance> mText[MAX_GLYPHS];
+		std::shared_ptr<SpriteBatch::Instance> mTextChars[MAX_CHARS];
+		size_t mNextCharInstance;
 
 		std::vector<std::shared_ptr<SpriteBatch::Instance>> mPendingDiamonds;
 
@@ -185,47 +187,38 @@ namespace King {
 		return advance*TextScale;
 	}
 
-	void Engine::Write(const char* text, const glm::mat4& transform) {
-		//glLoadMatrixf(reinterpret_cast<const float*>(&transform));
-		int advance = 0;
-		for (; *text;++text) {
-			Glyph& g = FindGlyph(*text);
+	void Engine::Write(const char* text, glm::vec2 position, glm::vec2 size, glm::vec4 color, float rotation) {
 
-		/*	float fontTexWidth  = static_cast<float>(mPimpl->mFontSdlSurface->Width());
-			float fontTexHeight = static_cast<float>(mPimpl->mFontSdlSurface->Height());
+		auto& text_batch = mPimpl->GetTextBatch();
+		
+		int32_t advance = 0;
+		for (; *text; ++text) {
 
-			float uvLeft = static_cast<float>(g.x) / fontTexWidth;
-			float uvRight = static_cast<float>(g.x + g.width) / fontTexWidth;
-			float uvBottom = static_cast<float>(g.y) / fontTexHeight;
-			float uvTop = static_cast<float>(g.y + g.height) / fontTexHeight;
+			// TODO: Reuse empty chars by returning a text handler
+			if (mPimpl->mNextCharInstance >= MAX_CHARS) {
+				return;
+			}
 
-			float worldLeft = static_cast<float>(g.xoffset + advance);
-			float worldRight = static_cast<float>(g.xoffset + g.width + advance);
-			float worldBottom = static_cast<float>(g.yoffset);
-			float worldTop = static_cast<float>(g.yoffset + g.height);
+			auto& char_instance = mPimpl->mTextChars[mPimpl->mNextCharInstance++];
+			text_batch->swapInstanceTemplate(char_instance, *mPimpl->GetTextTemplates()[*text]);
+			text_batch->updateInstance(char_instance, glm::vec2(position.x + advance, position.y), size, color, rotation);
 
-			mPimpl->mFontSdlSurface->Bind();*/
-
-			//glBegin(GL_QUADS);
-			//glTexCoord2f(uvLeft / 2.0f, uvTop / 2.0f); glVertex2f(worldLeft * TextScale, worldTop * TextScale);
-			//glTexCoord2f(uvRight / 2.0f, uvTop / 2.0f); glVertex2f(worldRight * TextScale, worldTop * TextScale);
-			//glTexCoord2f(uvRight / 2.0f, uvBottom / 2.0f); glVertex2f(worldRight * TextScale, worldBottom * TextScale);
-			//glTexCoord2f(uvLeft / 2.0f, uvBottom / 2.0f); glVertex2f(worldLeft * TextScale, worldBottom * TextScale);
-			//glEnd();
-			advance += g.advance;
+			// TODO: Correct the position taking into account the glyph properties
 		}
 	}
 
-	void Engine::Write(const char* text, float x, float y, float rotation) {
-		glm::mat4 transformation;
-		transformation = glm::translate(transformation, glm::vec3(x, y, 0.0f));
-		if (rotation) {
-			transformation = glm::rotate(transformation, rotation, glm::vec3(0.0f, 0.0f, 1.0f));
-			transformation = glm::translate(transformation,
-				glm::vec3(-CalculateStringWidth(text)/2.0f, -20.0f, 0.0f));
+	void Engine::Erease()
+	{
+		auto& text_batch = mPimpl->GetTextBatch();
+		for (auto c = 0; c < MAX_CHARS; ++c) {
+
+			// Make sure we don't display dead chars
+			auto& char_instance = mPimpl->mTextChars[c];
+			text_batch->swapInstanceTemplate(char_instance, *mPimpl->GetTextTemplates()[0]);
+			text_batch->updateInstance(char_instance, glm::vec2(0.f), glm::vec2(0.f));
 		}
 
-		Write(text, transformation);
+		mPimpl->mNextCharInstance = 0;
 	}
 
 	void Engine::ChangeCell(int32_t index, Background new_template)
@@ -525,7 +518,7 @@ namespace King {
 	void Engine::Implementation::InitSpriteBatches(const std::string & assets_dir) {
 		std::string texture_files[Engine::IMAGE_MAX] = {
 			assets_dir + "/textures/Cells.dds",
-			assets_dir + "/textures/fruits.dds",
+			assets_dir + "/textures/fruits_128.dds",
 			assets_dir + "/textures/berlin_sans_demi_72_0.dds"
 		};
 
@@ -542,10 +535,23 @@ namespace King {
 			auto* sprite_textrue = new SpriteTexture();
 			sprite_textrue->create(texture_files[si].c_str());
 
+			auto max_templates = SpriteBatch::MAX_TEMPLATES;
+			switch (si) {
+			case Engine::IMAGE_BACKGROUND:
+				max_templates = 4;
+				break;
+			case Engine::IMAGE_DIAMONDS:
+				max_templates = 8;
+				break;
+			case Engine::IMAGE_TEXT:
+				max_templates = MAX_GLYPHS;
+				break;
+			}
+
 			auto* sprite_batch = new SpriteBatch();
 			sprite_batch->init(projection, sprite_textrue->getTexId(),
 				vert_shader_file.c_str(), frag_shader_file.c_str(),
-				SpriteBatch::MAX_TEMPLATES, SpriteBatch::MAX_INSTANCES);
+				max_templates, SpriteBatch::MAX_INSTANCES);
 
 			// Add texture and sprite batch to the managed pointers
 			mTextures[si].reset(sprite_textrue);
@@ -563,7 +569,7 @@ namespace King {
 			for (size_t c_it = 0; c_it < Engine::CELL_MAX; ++c_it) {
 				GetBackgroundTemplates().push_back(std::make_unique<SpriteBatch::Template>(
 					mBatches[Engine::IMAGE_BACKGROUND]->createTemplate(
-						glm::vec4(c_it * x_step, 1.f, (c_it + 1) * x_step, 0.f))));
+						glm::vec4(c_it * x_step, 0.f, (c_it + 1) * x_step, 1.f))));
 			}
 		}
 
@@ -575,11 +581,31 @@ namespace King {
 			for (size_t d_it = 0; d_it < Engine::DIAMOND_MAX; ++d_it) {
 				GetDiamondTemplates().push_back(std::make_unique<SpriteBatch::Template>(
 					mBatches[Engine::IMAGE_DIAMONDS]->createTemplate(
-						glm::vec4(d_it * x_step, 1.f, (d_it + 1) * x_step, 0.f))));
+						glm::vec4(d_it * x_step, 0.f, (d_it + 1) * x_step, 1.f))));
 			}
 		}
 
-		// TODO: Cache font glyphs
+		// Cache font glyphs
+		{
+			float fontTexWidth = static_cast<float>(mTextures[Engine::IMAGE_TEXT]->getWidth());
+			float fontTexHeight = static_cast<float>(mTextures[Engine::IMAGE_TEXT]->getHeight());
+
+			int32_t advance = 0;
+			for (uint16_t c = 0; c < MAX_GLYPHS; ++c) {
+
+				Glyph& g = FindGlyph(static_cast<char>(c));
+
+				float uvLeft = static_cast<float>(g.x) / fontTexWidth;
+				float uvRight = static_cast<float>(g.x + g.width) / fontTexWidth;
+				float uvBottom = static_cast<float>(g.y) / fontTexHeight;
+				float uvTop = static_cast<float>(g.y + g.height) / fontTexHeight;
+
+				GetTextTemplates().push_back(std::make_unique<SpriteBatch::Template>(
+					mBatches[Engine::IMAGE_TEXT]->createTemplate(glm::vec4(uvLeft, uvBottom, uvRight, uvTop))));
+			}
+
+			mNextCharInstance = 0;
+		}
 	}
 
 	void Engine::Implementation::InitSpriteIntances() {
@@ -614,6 +640,12 @@ namespace King {
 		// Initialise diamond templates mapping
 		for (auto i = 0; i < GetNumOfGridCells(); ++i) {
 			mDiamondsTemplateMap[i] = Engine::DIAMOND_MAX;
+		}
+
+		// Initialise text char instances
+		for (auto c = 0; c < MAX_CHARS; ++c) {
+			// All char instances are initialise with the null character '\0'
+			mTextChars[c] = GetTextBatch()->addInstance(*GetTextTemplates()[0]);
 		}
 	}
 

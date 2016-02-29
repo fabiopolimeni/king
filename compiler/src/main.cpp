@@ -797,6 +797,9 @@ public:
 		}
 
 		const float delta_time = mEngine.GetLastFrameSeconds();
+
+		mEngine.Erease();
+		mEngine.Write("Fabio", glm::vec2(10.f), glm::vec2(14.f), glm::vec4(1.f));
 		
 		// Check the user wants to restart the match
 		if (IsMatching() && mEngine.IsKeyDown('r')) {

@@ -61,8 +61,8 @@ namespace King {
 		void Start(Updater& updater);
 		void Quit();
 
-		void Write(const char* text, const glm::mat4& transform);
-		void Write(const char* text, float x, float y, float rotation = 0.0f);
+		void Write(const char* text, glm::vec2 position, glm::vec2 size, glm::vec4 color, float rotation = 0);
+		void Erease();
 
 		void ChangeCell(int32_t index, Background new_template);
 		void UpdateCell(int32_t index, glm::vec2 size, glm::vec4 color, float rotation);

@@ -6,7 +6,7 @@
 #define UBO_DATA		3
 
 #define MAX_VERTICES	6
-#define MAX_TEMPLATES 	16
+#define MAX_TEMPLATES 	256
 #define MAX_INSTANCES 	256
 
 precision highp float;
@@ -68,7 +68,7 @@ void main()
 	// To fragment shader
 	VertColor = model.Color;
 	TexCoords = vertex.zw;
-	TexCoords.y = 1.0 - TexCoords.y;
+	//TexCoords.y = 1.0 - TexCoords.y;
 	
 	gl_Position = Projection.Ortho * model.Transform * vec4(vertex.xy, 0.0, 1.0);
 }
