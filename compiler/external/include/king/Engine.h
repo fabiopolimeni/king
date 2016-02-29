@@ -13,10 +13,10 @@ namespace King {
 		enum Background {
 
 			// Background
-			CELL_NEUTRAL,
+			CELL_AVAILABLE,
 			CELL_PICKED,
-			CELL_ALLOWED,
 			CELL_FORBIDDEN,
+			CELL_ALLOWED,
 			CELL_MAX
 		};
 
