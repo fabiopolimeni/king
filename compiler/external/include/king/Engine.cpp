@@ -26,6 +26,9 @@ namespace King {
 	static const int WindowHeight = 600;
 	static const float MaxFrameTicks = 300.0f;
 	static const float TextScale = 0.5f;
+
+	static const float CellScale = 1.0f;
+	static const float DiamondScale = 1.0f;
 	
 	const static size_t GRID_DIM = 8;
 	const static size_t MAX_GLYPHS = 256;
@@ -298,7 +301,7 @@ namespace King {
 		auto& instance = mPimpl->mDiamonds[index];
 		auto& diamonds_batch = mPimpl->GetDiamondBatch();
 		mPimpl->mDiamonds[index] = diamonds_batch->addInstance(*mPimpl->GetDiamondTemplates()[diamond_template]);
-		diamonds_batch->updateInstance(instance, GetCellPosition(index), glm::vec2(mPimpl->GetCellSize()));
+		diamonds_batch->updateInstance(instance, GetCellPosition(index), glm::vec2(mPimpl->GetCellSize()) * DiamondScale);
 		mPimpl->mDiamondsTemplateMap[index] = diamond_template;
 	}
 
@@ -487,7 +490,7 @@ namespace King {
 			SDL_GL_SwapWindow(mSdlWindow);
 
 			static float depth_value = 1.0f;
-			static glm::vec4 view_color(.35f);
+			static glm::vec4 view_color(.96f, .95f, .8f, 1.f);
 			glClearBufferfv(GL_DEPTH, 0, &depth_value);
 			glClearBufferfv(GL_COLOR, 0, &view_color[0]);
 
@@ -522,7 +525,7 @@ namespace King {
 	void Engine::Implementation::InitSpriteBatches(const std::string & assets_dir) {
 		std::string texture_files[Engine::IMAGE_MAX] = {
 			assets_dir + "/textures/Cells.dds",
-			assets_dir + "/textures/Diamonds.dds",
+			assets_dir + "/textures/fruits.dds",
 			assets_dir + "/textures/berlin_sans_demi_72_0.dds"
 		};
 
@@ -585,7 +588,7 @@ namespace King {
 
 		int32_t n_cells = GetNumOfGridCells();
 		float grid_step = GetCellSize();
-		float gird_scale = 0.98f;
+		float gird_scale = CellScale;
 		
 		int32_t row_id = -1;
 		int32_t col_id = 0;
