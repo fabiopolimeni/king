@@ -164,6 +164,8 @@ private:
 			for (auto i = matchings; i < steps; ++i) {
 
 				const int32_t follow_index = mEngine.GetGridIndex(++col, row);
+				if (!mEngine.IsValidGridIndex(follow_index)) break;
+
 				Engine::Diamond cell_diamond = mEngine.GetGridDiamond(follow_index);
 
 				if (cell_diamond == first_diamond &&
@@ -200,6 +202,8 @@ private:
 			for (auto i = matchings; i < steps; ++i) {
 
 				const int32_t follow_index = mEngine.GetGridIndex(col, ++row);
+				if (!mEngine.IsValidGridIndex(follow_index)) break;
+
 				Engine::Diamond cell_diamond = mEngine.GetGridDiamond(follow_index);
 
 				if (cell_diamond == first_diamond &&
