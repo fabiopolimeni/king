@@ -12,7 +12,7 @@
 #include <glm/vec4.hpp>
 #include <glm/common.hpp>
 
-#define TRACKING
+//#define TRACKING
 
 //**********************************************************************
 
@@ -75,7 +75,7 @@ class ExampleGame : public King::Updater
 
 	float mRoundTime;
 	float mMatchTime;
-	uint32_t mPoints;
+	uint32_t mPlayerScore;
 	int32_t mPickIndex;
 
 private:
@@ -105,7 +105,7 @@ private:
 		// Restart round timer
 		mRoundTime = ROUND_TIME;
 		mMatchTime = MATCH_TIME;
-		mPoints = 0;
+		mPlayerScore = 0;
 		mPickIndex = -1;
 
 		//// Debug
@@ -310,19 +310,24 @@ private:
 	// Resolve diamond states after a grid check
 	void ResolveExplosions() {
 
+		uint32_t n_explosions = 0;
 		for (auto i = 0; i < mEngine.GetGridSize(); ++i) {
 
 			DiamondState& diamond_state = GetDiamondState(i);
 			if (diamond_state == DiamondState::EXPLOD) {
 				diamond_state = DiamondState::EMPTY;
 				mEngine.RemoveDiamond(i);
+				++n_explosions;
 
 #ifdef TRACKING
 				fprintf(stdout, "Removed diamond (%d) from %s\n", i, __FUNCTION__);
 #endif
 			}
-			
 		}
+
+		// Player scoring is exponential, the more
+		// explosions in one tick the more the points
+		mPlayerScore += n_explosions * n_explosions;
 	}
 
 	// Check whether any of the column needs to start falling and mark cells accordingly
@@ -513,7 +518,7 @@ private:
 		}
 	}
 
-	bool IsIndexAdjacent(const int32_t a, const int32_t b) const {
+	bool IsDiamondAdjacent(const int32_t a, const int32_t b) const {
 
 		const auto a_row = mEngine.GetGriRow(a);
 		const auto a_col = mEngine.GetGridColumn(a);
@@ -565,6 +570,13 @@ private:
 		GetDiamondState(second_index) = DiamondState::SWAPPING;
 	}
 
+	// Implement can swap rules
+	bool CanSwapDiamonds(int32_t first_index, int32_t second_index) {
+
+		// Return true at all time
+		return true;
+	}
+
 	// Check what and if the player has selected any cell
 	bool CheckPlayerPick() {
 
@@ -573,52 +585,37 @@ private:
 			auto cell_index = mEngine.GetCellIndex(int32_t(mEngine.GetMouseX()), int32_t(mEngine.GetMouseY()));
 
 			// User can pick up only ready diamonds
-			if (mEngine.IsValidGridIndex(cell_index)) {
-
-				// If current and previous index are the same,
-				// player is toggling on/off selection.
-				if (mPickIndex == cell_index) {
-					
-					// FIXME: IsMouseButtonDown is true for the all time the user jeep it pressed
-					if (GetDiamondState(cell_index) == DiamondState::READY) {
-						GetDiamondState(cell_index) = DiamondState::SELECTED;
-						mPickIndex = cell_index;
-					}
-					else if (GetDiamondState(cell_index) == DiamondState::SELECTED) {
-						GetDiamondState(cell_index) = DiamondState::READY;
-						mPickIndex = -1;
-					}
-
-				} else if (GetDiamondState(cell_index) == DiamondState::READY) {
-
-					// If this new index is adjacent to the previous one,
-					// then the player is trying to swap the diamond
+			if (mEngine.IsValidGridIndex(cell_index))
+			{
+				if (GetDiamondState(cell_index) == DiamondState::READY)
+				{
+					// If previous selection is valid and the new index is
+					// adjacent, then the player is trying to swap the diamonds
 					if (mEngine.IsValidGridIndex(mPickIndex)) {
 
-						if (IsIndexAdjacent(cell_index, mPickIndex)) {
+						// Swap only if allowed
+						if (IsDiamondAdjacent(cell_index, mPickIndex)
+							&& CanSwapDiamonds(cell_index, mPickIndex)) {
 
 							SwapDiamonds(cell_index, mPickIndex, SWAPPING_TIME);
 							mPickIndex = -1;
-						}
-						else
-						{
-							// Otherwise she/he want just to select a new
-							// diamond and remove any previous selection
-							GetDiamondState(mPickIndex) = DiamondState::READY;
-							GetDiamondState(cell_index) = DiamondState::SELECTED;
-							mPickIndex = cell_index;
+							return true;
 						}
 					}
-					else {
 
-						GetDiamondState(cell_index) = DiamondState::SELECTED;
-						mPickIndex = cell_index;
+					if (mEngine.IsValidGridIndex(mPickIndex)) {
+						GetDiamondState(mPickIndex) = DiamondState::READY;
 					}
+
+					GetDiamondState(cell_index) = DiamondState::SELECTED;
+					mPickIndex = cell_index;
 				}
 
-#ifdef TRACKING
-				fprintf(stdout, "Selected diamond (%d) from %s\n", cell_index, __FUNCTION__);
-#endif
+				// Invalidate previous selection if necessary
+				if (mEngine.IsValidGridIndex(mPickIndex) && cell_index != mPickIndex) {
+					GetDiamondState(mPickIndex) = DiamondState::READY;
+					mPickIndex = -1;
+				}
 
 				return true;
 			}
@@ -772,7 +769,7 @@ public:
 		, mDiamondStates(new DiamondState[mEngine.GetGridSize()])
 		, mRoundTime(ROUND_TIME)
 		, mMatchTime(MATCH_TIME)
-		, mPoints(0)
+		, mPlayerScore(0)
 		, mPickIndex(-1)
 	{
 	}
@@ -868,8 +865,8 @@ public:
 		}
 
 #ifndef TRACKING
-		fprintf(stdout, "Time left: %ds - Next spawns in %.1fs\r",
-			int32_t(mMatchTime), mRoundTime);
+		fprintf(stdout, "Time left: %ds - Next spawns in %.1fs Score: %d\r",
+			int32_t(mMatchTime), mRoundTime, mPlayerScore);
 #endif
 	}
 
@@ -884,7 +881,7 @@ const int32_t ExampleGame::CHECK_STEPS = 3;
 const int32_t ExampleGame::MAX_INIT_HEIGHT = 4;
 
 const float ExampleGame::FALLING_TIME = 1.5f;
-const float ExampleGame::ROUND_TIME = 10.0f;
+const float ExampleGame::ROUND_TIME = 1.0f;
 const float ExampleGame::MATCH_TIME = 90.f;
 const float ExampleGame::SWAPPING_TIME = 0.6f;
 
