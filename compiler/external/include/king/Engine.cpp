@@ -227,7 +227,7 @@ namespace King {
 
 	void Engine::ChangeCell(int32_t index, Background new_template)
 	{
-		assert(index < mPimpl->GetNumOfGridCells());
+		assert(IsValidGridIndex(index));
 		auto& instance = mPimpl->mBackground[index];
 		auto& grid_batch = mPimpl->GetBackgroundBatch();
 		const auto& sprite_template = mPimpl->GetBackgroundTemplates()[new_template];
@@ -236,7 +236,7 @@ namespace King {
 
 	void Engine::UpdateCell(int32_t index, glm::vec2 size, glm::vec4 color, float rotation)
 	{
-		assert(index < mPimpl->GetNumOfGridCells());
+		assert(IsValidGridIndex(index));
 		auto& instance = mPimpl->mBackground[index];
 		auto& grid_batch = mPimpl->GetBackgroundBatch();
 		grid_batch->updateInstance(instance, grid_batch->getInstancePosition(instance), size, color, rotation);
@@ -244,7 +244,7 @@ namespace King {
 
 	void Engine::GetDiamondData(int32_t index, glm::vec2 & position, glm::vec2 & size, glm::vec4 & color, float & rotation) const
 	{
-		assert(index < mPimpl->GetNumOfGridCells());
+		assert(IsValidGridIndex(index));
 		auto& diamonds_batch = mPimpl->GetDiamondBatch();
 		auto& instance = mPimpl->mDiamonds[index];
 
@@ -257,7 +257,7 @@ namespace King {
 
 	void Engine::UpdateDiamond(int32_t index, glm::vec2 position, glm::vec2 size, glm::vec4 color, float rotation)
 	{
-		assert(index < mPimpl->GetNumOfGridCells());
+		assert(IsValidGridIndex(index));
 		auto& instance = mPimpl->mDiamonds[index];
 		auto& diamonds_batch = mPimpl->GetDiamondBatch();
 		diamonds_batch->updateInstance(instance, position, size, color, rotation);
@@ -265,7 +265,7 @@ namespace King {
 
 	void Engine::MoveDiamond(int32_t index, glm::vec2 translate, glm::vec2 scale, float rotate)
 	{
-		assert(index < mPimpl->GetNumOfGridCells());
+		assert(IsValidGridIndex(index));
 		auto& diamonds_batch = mPimpl->GetDiamondBatch();
 		auto& instance = mPimpl->mDiamonds[index];
 
@@ -280,7 +280,7 @@ namespace King {
 
 	void Engine::ChangeDiamond(int32_t index, Diamond new_template)
 	{
-		assert(index < mPimpl->GetNumOfGridCells());
+		assert(IsValidGridIndex(index));
 		auto& instance = mPimpl->mDiamonds[index];
 		auto& diamonds_batch = mPimpl->GetDiamondBatch();
 		const auto& sprite_template = mPimpl->GetDiamondTemplates()[new_template];
@@ -290,7 +290,7 @@ namespace King {
 
 	void Engine::AddDiamond(int32_t index, Diamond diamond_template)
 	{
-		assert(index < mPimpl->GetNumOfGridCells());
+		assert(IsValidGridIndex(index));
 
 		// Remove any previous diamond sprite instance
 		RemoveDiamond(index);
@@ -349,7 +349,7 @@ namespace King {
 
 	glm::vec2 Engine::GetCellPosition(int32_t index) const
 	{
-		assert(index < mPimpl->GetNumOfGridCells());
+		assert(IsValidGridIndex(index));
 		int32_t row_id = index / mPimpl->GetGridDims();
 		int32_t col_id = index - (row_id * mPimpl->GetGridDims());
 
@@ -360,8 +360,13 @@ namespace King {
 
 	bool Engine::IsCellFull(int32_t index) const
 	{
-		assert(index < mPimpl->GetNumOfGridCells());
+		assert(IsValidGridIndex(index));
 		return mPimpl->mDiamonds[index].get() != nullptr;
+	}
+
+	bool Engine::IsValidGridIndex(int32_t index) const
+	{
+		return (index >= 0 && index < mPimpl->GetNumOfGridCells());
 	}
 
 	int32_t Engine::GetGridIndex(int32_t grid_x, int32_t gird_y) const
@@ -371,13 +376,13 @@ namespace King {
 
 	int32_t Engine::GetGriRow(int32_t index) const
 	{
-		assert(index < mPimpl->GetNumOfGridCells());
+		assert(IsValidGridIndex(index));
 		return index / mPimpl->GetGridDims();
 	}
 
 	int32_t Engine::GetGridColumn(int32_t index) const
 	{
-		assert(index < mPimpl->GetNumOfGridCells());
+		assert(IsValidGridIndex(index));
 		return index - (GetGriRow(index) * mPimpl->GetGridDims());
 	}
 
@@ -388,7 +393,7 @@ namespace King {
 
 	Engine::Diamond Engine::GetGridDiamond(int32_t index) const
 	{
-		assert(index < mPimpl->GetNumOfGridCells());
+		assert(IsValidGridIndex(index));
 		return IsCellFull(index)
 			? mPimpl->mDiamondsTemplateMap[index]
 			: Diamond::DIAMOND_MAX;

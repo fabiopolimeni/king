@@ -22,6 +22,7 @@ class ExampleGame : public King::Updater
 	static const int32_t CHECK_STEPS;
 	static const int32_t MAX_INIT_HEIGHT;
 	static const float FALLING_TIME;
+	static const float SWAPPING_TIME;
 	static const float ROUND_TIME;
 	static const float MATCH_TIME;
 
@@ -59,10 +60,7 @@ class ExampleGame : public King::Updater
 		EMPTY,		// No diamond onto the requested grid cell
 		READY,		// Diamond is in its ready state
 		SPAWNING,	// Diamond is spawning (moving from the top?)
-		SWAP_UP,	// Diamond has been requested to be swapped up
-		SWAP_DOWN,	// Diamond has been requested to be swapped down
-		SWAP_RIGHT,	// Diamond has been requested to be swapped right
-		SWAP_LEFT,	// Diamond has been requested to be swapped left
+		SWAPPING,	// Diamond has been requested to be swapped
 		DRAGGED,	// Diamond is being moved by the player
 		EXPLOD,		// Diamond needs to explode
 		SELECTED,	// Diamond has been selected
@@ -78,6 +76,7 @@ class ExampleGame : public King::Updater
 	float mRoundTime;
 	float mMatchTime;
 	uint32_t mPoints;
+	int32_t mPickIndex;
 
 private:
 
@@ -107,6 +106,7 @@ private:
 		mRoundTime = ROUND_TIME;
 		mMatchTime = MATCH_TIME;
 		mPoints = 0;
+		mPickIndex = -1;
 
 		//// Debug
 		//mEngine.AddDiamond(0, Engine::DIAMOND_PURPLE);
@@ -358,8 +358,6 @@ private:
 					cur_target.index = below_index;
 					cur_target.type = mEngine.GetGridDiamond(curr_index);
 
-					mUpdatingDiamonds.push_back(cur_target);
-
 					// Add a new diamond into the below position which we update with the current data
 					mEngine.AddDiamond(below_index, mEngine.GetGridDiamond(curr_index));
 					mEngine.UpdateDiamond(below_index, mEngine.GetCellPosition(curr_index), cur_target.size, cur_target.color, cur_target.rotation);
@@ -377,6 +375,7 @@ private:
 					fprintf(stdout, "Removed diamond (%d) from %s\n", curr_index, __FUNCTION__);
 #endif
 
+					mUpdatingDiamonds.push_back(cur_target);
 					any_moving = true;
 				}
 			}
@@ -389,7 +388,7 @@ private:
 	// Returns false if it finished to update
 	bool AdvanceDiamond(DataTarget& diamond_data, float time_step) {
 
-		auto& diamond_state = GetDiamondState(diamond_data.index);
+		const auto& diamond_state = GetDiamondState(diamond_data.index);
 
 		if (diamond_state == DiamondState::EMPTY) {
 			return false;
@@ -412,6 +411,7 @@ private:
 		if (diamond_data.life <= 0.f) {
 			diamond_data.life = 0.f;
 			GetDiamondState(diamond_data.index) = DiamondState::READY;
+			//mEngine.ChangeDiamond(diamond_data.index, diamond_data.type);
 			return false;
 		}
 
@@ -443,13 +443,13 @@ private:
 
 	// Return the diamond state
 	DiamondState GetDiamondState(int32_t index) const {
-		assert(index < mEngine.GetGridSize());
+		assert(index >= 0 &&index < mEngine.GetGridSize());
 		return mDiamondStates.get()[index];
 	}
 
 	// Return the diamond state
 	DiamondState& GetDiamondState(int32_t index) {
-		assert(index < mEngine.GetGridSize());
+		assert(index >= 0 && index < mEngine.GetGridSize());
 		return mDiamondStates.get()[index];
 	}
 
@@ -502,12 +502,129 @@ private:
 			}
 			else {
 				GetDiamondState(grid_index) = DiamondState::SPAWNING;
+#ifdef TRACKING
+				fprintf(stdout, "Spawning diamond (%d) from %s\n", grid_index, __FUNCTION__);
+#endif
 			}
 		}
 		else {
 
 			EndMatch();
 		}
+	}
+
+	bool IsIndexAdjacent(const int32_t a, const int32_t b) const {
+
+		const auto a_row = mEngine.GetGriRow(a);
+		const auto a_col = mEngine.GetGridColumn(a);
+
+		const auto b_row = mEngine.GetGriRow(b);
+		const auto b_col = mEngine.GetGridColumn(b);
+
+		const auto a_plus_b = std::abs(a_row - b_row) + std::abs(a_col - b_col);
+
+		return a_plus_b == 1;
+	}
+
+	// Swaps to diamonds over time by adding them to the updating ones
+	void SwapDiamonds(int32_t first_index, int32_t second_index, float swapping_time) {
+
+		// Get data from first diamond
+		DataTarget first_target;
+		mEngine.GetDiamondData(first_index, first_target.position, first_target.size, first_target.color, first_target.rotation);
+
+		first_target.time = swapping_time;
+		first_target.life = swapping_time;
+		first_target.index = first_index;
+		first_target.type = mEngine.GetGridDiamond(second_index);
+
+		// Get data from second diamond
+		DataTarget second_target;
+		mEngine.GetDiamondData(second_index, second_target.position, second_target.size, second_target.color, second_target.rotation);
+
+		second_target.time = swapping_time;
+		second_target.life = swapping_time;
+		second_target.index = second_index;
+		second_target.type = mEngine.GetGridDiamond(first_index);
+
+		// We set the position of the first target to the second one,
+		// we swap the templates to create the illusion this is moving
+		mEngine.UpdateDiamond(first_index, second_target.position, first_target.size, first_target.color, first_target.rotation);
+		mEngine.ChangeDiamond(first_index, first_target.type);
+
+		// Same as above with first and second position/template inverted
+		mEngine.UpdateDiamond(second_index, first_target.position, second_target.size, second_target.color, second_target.rotation);
+		mEngine.ChangeDiamond(second_index, second_target.type);
+
+		// Add both to the updating diamonds
+		mUpdatingDiamonds.push_back(first_target);
+		mUpdatingDiamonds.push_back(second_target);
+
+		// As long as they remain in this state cannot be exploded
+		GetDiamondState(first_index) = DiamondState::SWAPPING;
+		GetDiamondState(second_index) = DiamondState::SWAPPING;
+	}
+
+	// Check what and if the player has selected any cell
+	bool CheckPlayerPick() {
+
+		if (mEngine.IsMouseButtonDown(1)) {
+
+			auto cell_index = mEngine.GetCellIndex(int32_t(mEngine.GetMouseX()), int32_t(mEngine.GetMouseY()));
+
+			// User can pick up only ready diamonds
+			if (mEngine.IsValidGridIndex(cell_index)) {
+
+				// If current and previous index are the same,
+				// player is toggling on/off selection.
+				if (mPickIndex == cell_index) {
+					
+					// FIXME: IsMouseButtonDown is true for the all time the user jeep it pressed
+					if (GetDiamondState(cell_index) == DiamondState::READY) {
+						GetDiamondState(cell_index) = DiamondState::SELECTED;
+						mPickIndex = cell_index;
+					}
+					else if (GetDiamondState(cell_index) == DiamondState::SELECTED) {
+						GetDiamondState(cell_index) = DiamondState::READY;
+						mPickIndex = -1;
+					}
+
+				} else if (GetDiamondState(cell_index) == DiamondState::READY) {
+
+					// If this new index is adjacent to the previous one,
+					// then the player is trying to swap the diamond
+					if (mEngine.IsValidGridIndex(mPickIndex)) {
+
+						if (IsIndexAdjacent(cell_index, mPickIndex)) {
+
+							SwapDiamonds(cell_index, mPickIndex, SWAPPING_TIME);
+							mPickIndex = -1;
+						}
+						else
+						{
+							// Otherwise she/he want just to select a new
+							// diamond and remove any previous selection
+							GetDiamondState(mPickIndex) = DiamondState::READY;
+							GetDiamondState(cell_index) = DiamondState::SELECTED;
+							mPickIndex = cell_index;
+						}
+					}
+					else {
+
+						GetDiamondState(cell_index) = DiamondState::SELECTED;
+						mPickIndex = cell_index;
+					}
+				}
+
+#ifdef TRACKING
+				fprintf(stdout, "Selected diamond (%d) from %s\n", cell_index, __FUNCTION__);
+#endif
+
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	// Change cell background in accordance to the state of the cell
@@ -530,7 +647,7 @@ private:
 
 			case DiamondState::SELECTED:
 			case DiamondState::DRAGGED:
-				cell_bg = Engine::Background::CELL_ALLOWED;
+				cell_bg = Engine::Background::CELL_PICKED;
 				break;
 			}
 
@@ -656,6 +773,7 @@ public:
 		, mRoundTime(ROUND_TIME)
 		, mMatchTime(MATCH_TIME)
 		, mPoints(0)
+		, mPickIndex(-1)
 	{
 	}
 
@@ -699,6 +817,10 @@ public:
 			if (CheckAdjacencies()) {
 				ResolveExplosions();
 				SetGameState(GameState::GRID_EXPLODING);
+			}
+
+			if (CheckPlayerPick()) {
+				SetGameState(GameState::PLAYER_MOVING);
 			}
 
 			// If we have exploded some of the diamonds
@@ -762,8 +884,10 @@ const int32_t ExampleGame::CHECK_STEPS = 3;
 const int32_t ExampleGame::MAX_INIT_HEIGHT = 4;
 
 const float ExampleGame::FALLING_TIME = 1.5f;
-const float ExampleGame::ROUND_TIME = 1.0f;
+const float ExampleGame::ROUND_TIME = 10.0f;
 const float ExampleGame::MATCH_TIME = 90.f;
+const float ExampleGame::SWAPPING_TIME = 0.6f;
+
 
 int main(int argc, char *argv[])
 {

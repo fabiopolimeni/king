@@ -79,6 +79,7 @@ namespace King {
 		int32_t GetCellIndex(int32_t screen_x, int32_t screen_y) const;
 		glm::vec2 GetCellPosition(int32_t index) const;
 		bool IsCellFull(int32_t index) const;
+		bool IsValidGridIndex(int32_t index) const;
 
 		int32_t GetGridIndex(int32_t grid_x, int32_t gird_y) const;
 		int32_t GetGriRow(int32_t index) const;
