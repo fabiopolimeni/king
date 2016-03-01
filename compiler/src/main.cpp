@@ -12,8 +12,6 @@
 #include <glm/vec4.hpp>
 #include <glm/common.hpp>
 
-#include "format.hpp"
-
 //#define TRACKING
 
 //**********************************************************************
