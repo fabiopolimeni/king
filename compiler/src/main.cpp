@@ -12,6 +12,8 @@
 #include <glm/vec4.hpp>
 #include <glm/common.hpp>
 
+#include "format.hpp"
+
 //#define TRACKING
 
 //**********************************************************************
@@ -76,6 +78,7 @@ class ExampleGame : public King::Updater
 	float mRoundTime;
 	float mMatchTime;
 	uint32_t mPlayerScore;
+	uint32_t mLastScore;
 	int32_t mPickIndex;
 
 private:
@@ -516,10 +519,6 @@ private:
 #endif
 			}
 		}
-		else {
-
-			EndMatch();
-		}
 	}
 
 	bool IsDiamondAdjacent(const int32_t a, const int32_t b) const {
@@ -595,7 +594,7 @@ private:
 				{
 					// If previous selection is valid and the new index is
 					// adjacent, then the player is trying to swap the diamonds
-					if (mEngine.IsValidGridIndex(mPickIndex)) {
+					if (mEngine.IsValidGridIndex(mPickIndex) && GetDiamondState(mPickIndex) != DiamondState::EMPTY) {
 
 						// Swap only if allowed
 						if (IsDiamondAdjacent(cell_index, mPickIndex)
@@ -656,6 +655,41 @@ private:
 		}
 	}
 
+	// Print all information on screen
+	void ShowInfo() {
+
+		char text[128] = { 0 };
+		float x = 0.f;
+		float font_size = 30.f;
+
+		// Right column
+		{
+			float row_height = 4.f + font_size;
+			glm::vec2 right_align = glm::vec2(
+				mEngine.GetGridWidth() * mEngine.GetGridCellSize() + 20.f,
+				mEngine.GetWindowHeight());
+
+			sprintf_s<sizeof(text)>(text, "Time Left: %ds", int32_t(mMatchTime));
+			x = mEngine.Write(text, right_align + glm::vec2(0.f, -row_height), glm::vec4(1.f), font_size);
+
+			right_align.y -= row_height;
+			sprintf_s<sizeof(text)>(text, "Score: %d", mPlayerScore);
+			x = mEngine.Write(text, right_align + glm::vec2(0.f, -row_height), glm::vec4(1.f), font_size);
+		}
+
+		// Low info
+		{
+			if (IsMatching()) {
+				sprintf_s<sizeof(text)>(text, "Press R to start a new match");
+				x = mEngine.Write(text, glm::vec2(15.f, 5.f), glm::vec4(1.f), font_size);
+			}
+			else {
+				sprintf_s<sizeof(text)>(text, "Press ENTER to start  Last SCORE: %d", mLastScore);
+				x = mEngine.Write(text, glm::vec2(15.f, 5.f), glm::vec4(1.f), font_size);
+			}
+		}
+	}
+
 	// Check whether all the non empty cells have diamonds in ready state
 	bool IsGridReady() const {
 
@@ -668,6 +702,20 @@ private:
 		}
 
 		return true;
+	}
+
+	// Check whether all cells are empty
+	bool IsGridEmpty() const {
+
+		for (int32_t i = 0; i < mEngine.GetGridSize(); ++i) {
+
+			const DiamondState& diamond_state = GetDiamondState(i);
+			if (diamond_state != DiamondState::EMPTY) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	bool IsGridUpdating() const {
@@ -695,74 +743,11 @@ private:
 
 	void RestartMatch() {
 
+		mLastScore = mPlayerScore;
 		ClearGrid();
 		InitGrid(MAX_INIT_HEIGHT);
 		UpdateBackground();
-	}
-
-	void EndMatch() {
-
 		SetGameState(GameState::MATCH_END);
-		fprintf(stdout, "Match Ended!\n");
-
-		RestartMatch();
-	}
-
-	////////////////////////////////////////////////
-
-	void GenerateRandomDiamond() {
-
-		if (mEngine.IsMouseButtonDown(1)) {
-
-			std::random_device rd;
-			std::mt19937 gen(rd());
-			std::binomial_distribution<> dis(Engine::DIAMOND_YELLOW, 0.5f);
-
-			Engine::Diamond diamond = static_cast<Engine::Diamond>(dis(gen));
-
-			auto cell_index = mEngine.GetCellIndex(int32_t(mEngine.GetMouseX()), int32_t(mEngine.GetMouseY()));
-			if (cell_index >= 0) {
-				mEngine.ChangeCell(cell_index, Engine::CELL_PICKED);
-
-				// Generate random diamond
-				if (!mEngine.IsCellFull(cell_index)) {
-					mEngine.AddDiamond(cell_index, diamond);
-
-					fprintf(stdout, "Background cell: %d (%2.f, %2.f)\nDiamond %d\n",
-						cell_index, mEngine.GetMouseX(), mEngine.GetMouseY(), diamond);
-				}
-			}
-		}
-	}
-
-	void RemoveDiamond() {
-
-		if (mEngine.IsMouseButtonDown(3)) {
-
-			auto cell_index = mEngine.GetCellIndex(int32_t(mEngine.GetMouseX()), int32_t(mEngine.GetMouseY()));
-			if (cell_index >= 0) {
-
-				// Remove diamond
-				if (mEngine.IsCellFull(cell_index)) {
-
-					mEngine.RemoveDiamond(cell_index);
-					fprintf(stdout, "Removed diamond: %d \n", cell_index);
-				}
-			}
-		}
-	}
-
-	bool Testing() {
-
-		bool bTest = false;
-
-		if (bTest) {
-
-			GenerateRandomDiamond();
-			RemoveDiamond();
-		}
-
-		return bTest;
 	}
 
 public:
@@ -774,6 +759,7 @@ public:
 		, mRoundTime(ROUND_TIME)
 		, mMatchTime(MATCH_TIME)
 		, mPlayerScore(0)
+		, mLastScore(0)
 		, mPickIndex(-1)
 	{
 	}
@@ -792,14 +778,10 @@ public:
 
 	void Update() {
 
-		if (Testing()) {
-			return;
-		}
-
 		const float delta_time = mEngine.GetLastFrameSeconds();
 
 		mEngine.Erease();
-		mEngine.Write("Fabio", glm::vec2(10.f), glm::vec2(14.f), glm::vec4(1.f));
+		ShowInfo();
 		
 		// Check the user wants to restart the match
 		if (IsMatching() && mEngine.IsKeyDown('r')) {
@@ -868,7 +850,7 @@ public:
 		// Check whether the match ended or the player won
 		if (mMatchTime <= 0.f) {
 			mMatchTime = MATCH_TIME;
-			EndMatch();
+			RestartMatch();
 		}
 
 #ifndef TRACKING

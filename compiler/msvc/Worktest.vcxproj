@@ -110,6 +110,7 @@
     <ClInclude Include="..\include\SpriteTexture.hpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\..\assets\shaders\font.frag" />
     <None Include="..\..\assets\shaders\sprite.frag" />
     <None Include="..\..\assets\shaders\sprite.vert" />
   </ItemGroup>

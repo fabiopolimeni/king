@@ -68,7 +68,6 @@ void main()
 	// To fragment shader
 	VertColor = model.Color;
 	TexCoords = vertex.zw;
-	//TexCoords.y = 1.0 - TexCoords.y;
 	
 	gl_Position = Projection.Ortho * model.Transform * vec4(vertex.xy, 0.0, 1.0);
 }

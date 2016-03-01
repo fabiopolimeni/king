@@ -29,6 +29,7 @@ namespace King {
 
 	static const float CellScale = 1.0f;
 	static const float DiamondScale = 1.0f;
+	static const float CharSpacing = 1.1f;
 	
 	const static size_t GRID_DIM = 8;
 	const static size_t MAX_GLYPHS = 256;
@@ -187,24 +188,31 @@ namespace King {
 		return advance*TextScale;
 	}
 
-	void Engine::Write(const char* text, glm::vec2 position, glm::vec2 size, glm::vec4 color, float rotation) {
+	float Engine::Write(const char* text, glm::vec2 position, glm::vec4 color, float size, float rotation) {
 
 		auto& text_batch = mPimpl->GetTextBatch();
 		
-		int32_t advance = 0;
+		float advance = 0.f;
 		for (; *text; ++text) {
 
 			// TODO: Reuse empty chars by returning a text handler
 			if (mPimpl->mNextCharInstance >= MAX_CHARS) {
-				return;
+				return 0.f;
 			}
 
 			auto& char_instance = mPimpl->mTextChars[mPimpl->mNextCharInstance++];
 			text_batch->swapInstanceTemplate(char_instance, *mPimpl->GetTextTemplates()[*text]);
-			text_batch->updateInstance(char_instance, glm::vec2(position.x + advance, position.y), size, color, rotation);
 
-			// TODO: Correct the position taking into account the glyph properties
+			Glyph& g = FindGlyph(*text);
+
+			float scale = size / float(g.height + g.yoffset);
+			glm::vec2 char_size = glm::vec2(g.width + g.xoffset, g.height) * scale;
+
+			text_batch->updateInstance(char_instance, glm::vec2(position.x + advance, position.y), char_size, color, rotation);
+			advance += g.advance * CharSpacing * scale;
 		}
+
+		return advance;
 	}
 
 	void Engine::Erease()
@@ -387,6 +395,11 @@ namespace King {
 		return mPimpl->GetNumOfGridCells();
 	}
 
+	float Engine::GetGridCellSize() const
+	{
+		return mPimpl->GetCellSize();
+	}
+
 	Engine::Diamond Engine::GetGridDiamond(int32_t index) const
 	{
 		assert(IsValidGridIndex(index));
@@ -426,7 +439,7 @@ namespace King {
 	}
 
 	int32_t Engine::Implementation::GetGridStartY() const {
-		return 30;
+		return 40;
 	}
 
 	int32_t Engine::Implementation::GetGridWidth() const {
@@ -434,7 +447,7 @@ namespace King {
 	}
 
 	int32_t Engine::Implementation::GetGridHeight() const {
-		return WindowHeight - GetGridStartY() * 2;
+		return WindowHeight - GetGridStartY();
 	}
 
 	float Engine::Implementation::GetCellSize() const {
@@ -524,6 +537,7 @@ namespace King {
 
 		std::string vert_shader_file = assets_dir + "/shaders/sprite.vert";
 		std::string frag_shader_file = assets_dir + "/shaders/sprite.frag";
+		std::string font_shader_file = assets_dir + "/shaders/font.frag";
 
 		glm::mat4 projection = glm::ortho(
 			0.0f, static_cast<float>(WindowWidth),
@@ -535,6 +549,7 @@ namespace King {
 			auto* sprite_textrue = new SpriteTexture();
 			sprite_textrue->create(texture_files[si].c_str());
 
+			const char* frag_shader = frag_shader_file.c_str();
 			auto max_templates = SpriteBatch::MAX_TEMPLATES;
 			switch (si) {
 			case Engine::IMAGE_BACKGROUND:
@@ -545,12 +560,13 @@ namespace King {
 				break;
 			case Engine::IMAGE_TEXT:
 				max_templates = MAX_GLYPHS;
+				frag_shader = font_shader_file.c_str();
 				break;
 			}
 
 			auto* sprite_batch = new SpriteBatch();
 			sprite_batch->init(projection, sprite_textrue->getTexId(),
-				vert_shader_file.c_str(), frag_shader_file.c_str(),
+				vert_shader_file.c_str(), frag_shader,
 				max_templates, SpriteBatch::MAX_INSTANCES);
 
 			// Add texture and sprite batch to the managed pointers

@@ -61,7 +61,7 @@ namespace King {
 		void Start(Updater& updater);
 		void Quit();
 
-		void Write(const char* text, glm::vec2 position, glm::vec2 size, glm::vec4 color, float rotation = 0);
+		float Write(const char* text, glm::vec2 position, glm::vec4 color, float size, float rotation = 0);
 		void Erease();
 
 		void ChangeCell(int32_t index, Background new_template);
@@ -85,6 +85,7 @@ namespace King {
 		int32_t GetGriRow(int32_t index) const;
 		int32_t GetGridColumn(int32_t index) const;
 		int32_t GetGridSize() const;
+		float GetGridCellSize() const;
 
 		Diamond GetGridDiamond(int32_t index) const;
 
